@@ -1,10 +1,11 @@
 import msal
 from config import config
-import logging
 import requests
 import json
+import my_logger
 
-logging.basicConfig(level=logging.INFO)
+log = my_logger.My_logger(__name__)
+# log.basicConfig(level=log.INFO)
 class AzureAd(object):
 
     def __init__(self):
@@ -19,11 +20,11 @@ class AzureAd(object):
         # Firstly, check the cache to see if this end user has signed in before
         accounts = self.app.get_accounts(username=config["username"])
         if accounts:
-            logging.info("Account(s) exists in cache, probably with token too. Let's try.")
+            log.info("Account(s) exists in cache, probably with token too. Let's try.")
             self.auth = self.app.acquire_token_silent(config["scope"], account=accounts[0])
 
         if not self.auth:
-            logging.info("No suitable token exists in cache. Let's get a new one from AAD.")
+            log.info("No suitable token exists in cache. Let's get a new one from AAD.")
             # See this page for constraints of Username Password Flow.
             # https://github.com/AzureAD/microsoft-authentication-library-for-python/wiki/Username-Password-Authentication
             self.auth = self.app.acquire_token_by_username_password(
@@ -158,8 +159,11 @@ class AzureAd(object):
         _lics = self.get_licences_o365e5()
         lics = _lics.json()
         if (int(lics['prepaidUnits']['enabled']) - int(lics['consumedUnits'])) < threshold:
-            logging.error("Exceeded licence threshold")
+            log.error("Exceeded licence threshold")
         else:
-            logging.info("Licence status OK")
+            log.info("Licence status OK")
+
+    def main(self):
+        pass
 
 
