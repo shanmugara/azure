@@ -11,8 +11,8 @@
 # pygraph
 config = {"authority": "https://login.microsoftonline.com/organizations",
           "client_id": 'dcdf039c-b816-4def-9d41-a807a1fa347c',
-          "username": "role1@m365x124493.onmicrosoft.com",
-          "password": "NO1is2know",
+          "username": "",
+          "password": "",
           "scope": ["User.ReadBasic.All", "User.ReadWrite.All"],
           "endpoint": "https://graph.microsoft.com/v1.0/users",
           "apiurl": "https://graph.microsoft.com/v1.0",

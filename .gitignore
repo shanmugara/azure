@@ -1,0 +1,12 @@
+/logs/
+/venv/
+/venv27/
+/.idea/
+*.pyc
+__pycache__
+.build
+.cache
+.coverage
+debian/files
+debian/python*
+**/.DS_Store
