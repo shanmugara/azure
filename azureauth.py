@@ -10,9 +10,9 @@ class AzureAd(object):
     def __init__(self):
 
         self.app = msal.ClientApplication(
-            config["client_id"],
+            config["client_id_lic"],
             authority=config["authority"],
-            client_credential=config.get("client_secret")
+            client_credential=config.get("client_secret_lic")
         )
 
         self.auth = None
@@ -27,7 +27,7 @@ class AzureAd(object):
             # See this page for constraints of Username Password Flow.
             # https://github.com/AzureAD/microsoft-authentication-library-for-python/wiki/Username-Password-Authentication
             self.auth = self.app.acquire_token_by_username_password(
-                config["username"], config["password"], scopes=config["scope"])
+                config["username"], config["password"], scopes=config["scope_lic"])
 
         if "access_token" in self.auth:
             # Calling graph using the access token
@@ -148,6 +148,18 @@ class AzureAd(object):
 
         return result
 
+    def lic_mon(self, threshold=5):
+        """
+        Monitor and report licence thresholds
+        :param threshold:
+        :return:
+        """
 
+        _lics = self.get_licences_o365e5()
+        lics = _lics.json()
+        if (int(lics['prepaidUnits']['enabled']) - int(lics['consumedUnits'])) < threshold:
+            logging.error("Exceeded licence threshold")
+        else:
+            logging.info("Licence status OK")
 
 
