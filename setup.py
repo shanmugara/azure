@@ -11,7 +11,7 @@ setup(name='azuregraph',
                         ],
       entry_points={
                     'console_scripts':
-                        ['callgraph = azureauth:main'],
+                        ['callgraph = runner:main'],
                     },
       include_package_data=True
 )
