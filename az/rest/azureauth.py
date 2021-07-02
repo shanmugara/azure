@@ -3,6 +3,7 @@ import requests
 import json
 import os
 import sys
+import urllib3
 
 # app_root = os.path.split(os.path.abspath(__file__))[0]
 # sys.path.insert(0, app_root)
@@ -11,16 +12,23 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from helpers import my_logger
 from helpers.config import config
 
-
-
 log = my_logger.My_logger(__name__)
 liclog = my_logger.My_logger('licence')
-
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # log.basicConfig(level=log.INFO)
 class AzureAd(object):
 
-    def __init__(self):
+    def __init__(self, proxy=None):
+
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        self.session = requests.Session()
+        if proxy is not None:
+            self.session.proxies = proxy
+        retries = Retry(total=5, backoff_factor=1, status_forcelist=[502, 503, 504])
+        self.session.mount("http://", HTTPAdapter(max_retries=retries))
+        self.session.mount("https://", HTTPAdapter(max_retries=retries))
 
         self.app = msal.ClientApplication(
             config["client_id_lic"],
@@ -77,7 +85,7 @@ class AzureAd(object):
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token']}
         _endpoint = config["endpoint"] + query_str
         print(_endpoint)
-        result = requests.get(_endpoint,
+        result = self.session.get(_endpoint,
                               headers=raw_headers)
 
         return result.json()
@@ -98,7 +106,7 @@ class AzureAd(object):
         _endpoint = config["endpoint"] + query_str
         print(_endpoint)
 
-        result = requests.patch(url=_endpoint, data=data_json, headers=raw_headers)
+        result = self.session.patch(url=_endpoint, data=data_json, headers=raw_headers)
 
         return result
 
@@ -119,7 +127,7 @@ class AzureAd(object):
 
         data_json = json.dumps(data)
         _endpoint = config["endpoint"] + "/{}/extensions".format(oid)
-        result = requests.post(url=_endpoint, data=data_json, headers=raw_headers)
+        result = self.session.post(url=_endpoint, data=data_json, headers=raw_headers)
 
         return result
 
@@ -133,7 +141,7 @@ class AzureAd(object):
         _endpoint = config["endpoint"] + "/{}/extensions".format(oid)
 
         try:
-            result = requests.get(url=_endpoint, headers=raw_headers)
+            result = self.session.get(url=_endpoint, headers=raw_headers)
             return result.json()
 
         except Exception as e:
@@ -150,7 +158,7 @@ class AzureAd(object):
         _endpoint = config["apiurl"] + "/subscribedSkus/{}".format(guid)
 
         try:
-            result = requests.get(url=_endpoint, headers=raw_headers)
+            result = self.session.get(url=_endpoint, headers=raw_headers)
             return result
         except Exception as e:
             log.error('Exception while making REST call - {}'.format(e))
@@ -165,7 +173,7 @@ class AzureAd(object):
         _endpoint = config["apiurl"] + "/subscribedSkus"
 
         try:
-            result = requests.get(url=_endpoint, headers=raw_headers)
+            result = self.session.get(url=_endpoint, headers=raw_headers)
             return result.json()
         except Exception as e:
             log.error('Exception while making REST call - {}'.format(e))
