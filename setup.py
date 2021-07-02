@@ -12,10 +12,10 @@ setup(name='azuregraph',
           'msal',
       ],
       package_dir={"": "src"},
-      packages=['rest', 'helpers'],
+      packages=['az','az.rest', 'az.helpers'],
       entry_points={
           'console_scripts':
-              ['callgraph = src.runner:main'],
+              ['callgraph = az.runner:main'],
       },
       include_package_data=True,
       zip_safe=False,

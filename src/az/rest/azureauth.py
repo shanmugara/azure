@@ -7,10 +7,10 @@ import urllib3
 
 # app_root = os.path.split(os.path.abspath(__file__))[0]
 # sys.path.insert(0, app_root)
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from helpers import my_logger
-from helpers.config import config
+from az.helpers import my_logger
+from az.helpers.config import config
 
 log = my_logger.My_logger(__name__)
 liclog = my_logger.My_logger('licence')

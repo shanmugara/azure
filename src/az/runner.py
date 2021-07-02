@@ -6,7 +6,7 @@ import os
 app_root = os.path.split(os.path.abspath(__file__))[0]
 sys.path.insert(0, app_root)
 
-from rest import azureauth
+from az.rest import azureauth
 
 def main():
     """
