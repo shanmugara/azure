@@ -12,6 +12,7 @@ setup(name='azuregraph',
           'msal',
       ],
       package_dir={"": "src"},
+      packages=['rest', 'helpers'],
       entry_points={
           'console_scripts':
               ['callgraph = src.runner:main'],
