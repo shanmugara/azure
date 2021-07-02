@@ -5,6 +5,9 @@ import json
 import my_logger
 
 log = my_logger.My_logger(__name__)
+liclog = my_logger.My_logger('licence')
+
+
 # log.basicConfig(level=log.INFO)
 class AzureAd(object):
 
@@ -120,9 +123,13 @@ class AzureAd(object):
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
         _endpoint = config["endpoint"] + "/{}/extensions".format(oid)
 
-        result = requests.get(url=_endpoint, headers=raw_headers)
+        try:
+            result = requests.get(url=_endpoint, headers=raw_headers)
+            return result.json()
 
-        return result
+        except Exception as e:
+            log.error('Exception while making REST call - {}'.format(e))
+            return False
 
     def get_licences_o365e5(self):
         """
@@ -133,9 +140,12 @@ class AzureAd(object):
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
         _endpoint = config["apiurl"] + "/subscribedSkus/{}".format(guid)
 
-        result = requests.get(url=_endpoint, headers=raw_headers)
-
-        return result
+        try:
+            result = requests.get(url=_endpoint, headers=raw_headers)
+            return result
+        except Exception as e:
+            log.error('Exception while making REST call - {}'.format(e))
+            return False
 
     def get_licences_all(self):
         """
@@ -145,9 +155,12 @@ class AzureAd(object):
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
         _endpoint = config["apiurl"] + "/subscribedSkus"
 
-        result = requests.get(url=_endpoint, headers=raw_headers)
-
-        return result
+        try:
+            result = requests.get(url=_endpoint, headers=raw_headers)
+            return result.json()
+        except Exception as e:
+            log.error('Exception while making REST call - {}'.format(e))
+            return False
 
     def lic_mon(self, threshold=5):
         """
@@ -155,15 +168,13 @@ class AzureAd(object):
         :param threshold:
         :return:
         """
-
         _lics = self.get_licences_o365e5()
+        if not _lics:
+            liclog.error('Failed to get licence data')
+            return
         lics = _lics.json()
-        if (int(lics['prepaidUnits']['enabled']) - int(lics['consumedUnits'])) < threshold:
-            log.error("Exceeded licence threshold")
+        free_lics = int(lics['prepaidUnits']['enabled']) - int(lics['consumedUnits'])
+        if (free_lics) < threshold:
+            liclog.error("O365 remaining licence count is {}. Failed licence count threshold.".format(free_lics))
         else:
-            log.info("Licence status OK")
-
-    def main(self):
-        pass
-
-
+            liclog.info("O365 remaining licence count is {}. Licence status OK".format(free_lics))
