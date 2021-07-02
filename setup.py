@@ -8,6 +8,7 @@ setup(name='azuregraph',
       author_email='',
       license='GPL',
       install_requires=['requests',
+                        'msal',
                         ],
       packages=['az'],
       entry_points={
