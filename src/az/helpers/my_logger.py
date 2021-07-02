@@ -1,7 +1,12 @@
 import logging
 import os
 import sys
+import platform
 from logging import handlers
+
+if platform.system().lower() == 'windows':
+    from colorama import init
+    init()
 
 # WARNING: do not initialize this as part of an import path!
 # It will try to create a directory for consumers during imports, which requires permissions
