@@ -9,10 +9,10 @@ setup(name='azuregraph',
       license='GPL',
       install_requires=['requests',
                         ],
-      packages=['qc', 'qc.common', 'qc.helpers', 'qc.appmodules', 'qc.appmodules.apache'],
+      packages=['az'],
       entry_points={
           'console_scripts':
-              ['callgraph = .runner:main'],
+              ['callgraph = az.runner:main'],
       },
       include_package_data=True
       )
