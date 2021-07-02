@@ -1,10 +1,12 @@
-import azureauth
+
 import argparse
 import sys
 import os
 
 app_root = os.path.split(os.path.abspath(__file__))[0]
 sys.path.insert(0, app_root)
+
+from rest import azureauth
 
 def main():
     """
