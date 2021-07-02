@@ -175,6 +175,7 @@ class AzureAd(object):
         lics = _lics.json()
         free_lics = int(lics['prepaidUnits']['enabled']) - int(lics['consumedUnits'])
         if (free_lics) < threshold:
-            liclog.error("O365 remaining licence count is {}. Failed licence count threshold.".format(free_lics))
+            liclog.error("O365 remaining licence count is {}. Failed licence count threshold of {}.".format(free_lics,
+                                                                                                            threshold))
         else:
             liclog.info("O365 remaining licence count is {}. Licence status OK".format(free_lics))
