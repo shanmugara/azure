@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import urllib3
+import platform
 
 # app_root = os.path.split(os.path.abspath(__file__))[0]
 # sys.path.insert(0, app_root)
@@ -12,7 +13,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 from az.helpers import my_logger
 from az.helpers.config import config
 
-LOG_DIR = os.environ['VIRTUAL_ENV']
+if platform.system().lower() == 'windows':
+    LOG_DIR = "c:\logs\azgraph"
+else:
+    LOG_DIR = os.path.join(os.environ['VIRTUAL_ENV'], 'logs', 'azgraph')
+
 log = my_logger.My_logger(logdir=LOG_DIR, logfile=__name__)
 liclog = my_logger.My_logger(logdir=LOG_DIR, logfile='licence.log')
 from requests.adapters import HTTPAdapter
