@@ -10,3 +10,4 @@ __pycache__
 debian/files
 debian/python*
 **/.DS_Store
+config.py

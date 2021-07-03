@@ -1,0 +1,16 @@
+MANIFEST.in
+setup.py
+src/az/__init__.py
+src/az/runner.py
+src/az/helpers/__init__.py
+src/az/helpers/config.py
+src/az/helpers/my_logger.py
+src/az/rest/__init__.py
+src/az/rest/azureauth.py
+src/azuregraph.egg-info/PKG-INFO
+src/azuregraph.egg-info/SOURCES.txt
+src/azuregraph.egg-info/dependency_links.txt
+src/azuregraph.egg-info/entry_points.txt
+src/azuregraph.egg-info/not-zip-safe
+src/azuregraph.egg-info/requires.txt
+src/azuregraph.egg-info/top_level.txt
