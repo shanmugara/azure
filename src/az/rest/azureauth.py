@@ -5,6 +5,7 @@ import os
 import sys
 import urllib3
 import platform
+import base64
 
 # app_root = os.path.split(os.path.abspath(__file__))[0]
 # sys.path.insert(0, app_root)
@@ -14,7 +15,7 @@ from az.helpers import my_logger
 from az.helpers.config import config
 
 if platform.system().lower() == 'windows':
-    LOG_DIR = os.path.join('c:\\','logs','azgraph')
+    LOG_DIR = os.path.join('c:\\', 'logs', 'azgraph')
 else:
     LOG_DIR = os.path.join(os.environ['VIRTUAL_ENV'], 'logs', 'azgraph')
 
@@ -27,7 +28,14 @@ from urllib3.util.retry import Retry
 # log.basicConfig(level=log.INFO)
 class AzureAd(object):
 
-    def __init__(self, proxy=None):
+    def __init__(self, proxy=config["proxy"]):
+
+        client_id = config["client_id"]
+        client_secret = config["client_secret"]
+        scope = config["scope"]
+        authority = config["authority"]
+        username = config["username"]
+        pwd = base64.b64decode(config['password'].decode("utf-8")).decode()
 
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         self.session = requests.Session()
@@ -38,29 +46,30 @@ class AzureAd(object):
         self.session.mount("https://", HTTPAdapter(max_retries=retries))
 
         self.app = msal.ClientApplication(
-            config["client_id_lic"],
-            authority=config["authority"],
-            client_credential=config.get("client_secret_lic")
+            client_id,
+            authority=authority,
+            client_credential=client_secret
         )
 
         self.auth = None
         # Firstly, check the cache to see if this end user has signed in before
-        accounts = self.app.get_accounts(username=config["username"])
+        accounts = self.app.get_accounts(username=username)
         if accounts:
             log.info("Account(s) exists in cache, probably with token too. Let's try.")
-            self.auth = self.app.acquire_token_silent(config["scope"], account=accounts[0])
+            self.auth = self.app.acquire_token_silent(scope, account=accounts[0])
 
         if not self.auth:
             log.info("No suitable token exists in cache. Let's get a new one from AAD.")
             # See this page for constraints of Username Password Flow.
             # https://github.com/AzureAD/microsoft-authentication-library-for-python/wiki/Username-Password-Authentication
-            self.auth = self.app.acquire_token_by_username_password(
-                config["username"], config["password"], scopes=config["scope_lic"])
+
+            self.auth = self.app.acquire_token_by_username_password(username, pwd, scopes=scope)
 
         if "access_token" in self.auth:
             # Calling graph using the access token
+            _endpoint = config["apiurl"] + "/users"
             graph_data = requests.get(  # Use token to call downstream service
-                config["endpoint"],
+                _endpoint,
                 headers={'Authorization': 'Bearer ' + self.auth['access_token']}, ).json()
             # print("Graph API call self.auth: %s" % json.dumps(graph_data, indent=2))
         else:
@@ -77,7 +86,7 @@ class AzureAd(object):
                        "ConsistencyLevel": "eventual"}
 
         query_str = '?$search="displayName:{}"'.format(displayname)
-        _endpoint = config["endpoint"] + query_str
+        _endpoint = config["apiurl"] + "/users" + query_str
         result = self.session.get(_endpoint,
                                   headers=raw_headers)
         return result.json()
@@ -89,7 +98,7 @@ class AzureAd(object):
         query_str = "/{}?$select=extm7dsnjo8_adatumext".format(oid)
 
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token']}
-        _endpoint = config["endpoint"] + query_str
+        _endpoint = config["apiurl"] + "/users" + query_str
         result = self.session.get(_endpoint,
                                   headers=raw_headers)
 
@@ -108,7 +117,7 @@ class AzureAd(object):
         data = {attrname: attrval}
         data_json = json.dumps(data)
         query_str = "/{}".format(oid)
-        _endpoint = config["endpoint"] + query_str
+        _endpoint = config["apiurl"] + "/users" + query_str
 
         result = self.session.patch(url=_endpoint, data=data_json, headers=raw_headers)
 
@@ -130,7 +139,7 @@ class AzureAd(object):
                 }
 
         data_json = json.dumps(data)
-        _endpoint = config["endpoint"] + "/{}/extensions".format(oid)
+        _endpoint = config["apiurl"] + "/users/{}/extensions".format(oid)
         result = self.session.post(url=_endpoint, data=data_json, headers=raw_headers)
 
         return result
@@ -142,7 +151,7 @@ class AzureAd(object):
         :return:
         """
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
-        _endpoint = config["endpoint"] + "/{}/extensions".format(oid)
+        _endpoint = config["apiurl"] + "/users/{}/extensions".format(oid)
 
         try:
             result = self.session.get(url=_endpoint, headers=raw_headers)
