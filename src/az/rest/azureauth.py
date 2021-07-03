@@ -14,7 +14,7 @@ from az.helpers import my_logger
 from az.helpers.config import config
 
 if platform.system().lower() == 'windows':
-    LOG_DIR = "c:\logs\azgraph"
+    LOG_DIR = os.path.join('c:\\','logs','azgraph')
 else:
     LOG_DIR = os.path.join(os.environ['VIRTUAL_ENV'], 'logs', 'azgraph')
 
