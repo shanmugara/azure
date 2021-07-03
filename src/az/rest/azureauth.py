@@ -12,10 +12,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 from az.helpers import my_logger
 from az.helpers.config import config
 
-log = my_logger.My_logger(__name__)
-liclog = my_logger.My_logger('licence')
+LOG_DIR = os.environ['VIRTUAL_ENV']
+log = my_logger.My_logger(logdir=LOG_DIR, logfile=__name__)
+liclog = my_logger.My_logger(logdir=LOG_DIR, logfile='licence.log')
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+
 
 # log.basicConfig(level=log.INFO)
 class AzureAd(object):
@@ -57,12 +59,12 @@ class AzureAd(object):
                 headers={'Authorization': 'Bearer ' + self.auth['access_token']}, ).json()
             # print("Graph API call self.auth: %s" % json.dumps(graph_data, indent=2))
         else:
-            print(self.auth.get("error"))
-            print(self.auth.get("error_description"))
-            print(self.auth.get("correlation_id"))  # You may need this when reporting a bug
+            log.error(self.auth.get("error"))
+            log.error(self.auth.get("error_description"))
+            log.error(self.auth.get("correlation_id"))  # You may need this when reporting a bug
             if 65001 in self.auth.get("error_codes", []):  # Not mean to be coded programatically, but...
                 # AAD requires user consent for U/P flow
-                print("Visit this to consent:", self.app.get_authorization_request_url(config["scope"]))
+                log.error("Visit this to consent:", self.app.get_authorization_request_url(config["scope"]))
 
     def search_user(self, displayname):
 
@@ -71,9 +73,8 @@ class AzureAd(object):
 
         query_str = '?$search="displayName:{}"'.format(displayname)
         _endpoint = config["endpoint"] + query_str
-        print(_endpoint)
-        result = requests.get(_endpoint,
-                              headers=raw_headers)
+        result = self.session.get(_endpoint,
+                                  headers=raw_headers)
         return result.json()
 
     def get_ext_attr(self, displayname):
@@ -84,9 +85,8 @@ class AzureAd(object):
 
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token']}
         _endpoint = config["endpoint"] + query_str
-        print(_endpoint)
         result = self.session.get(_endpoint,
-                              headers=raw_headers)
+                                  headers=raw_headers)
 
         return result.json()
 
@@ -104,7 +104,6 @@ class AzureAd(object):
         data_json = json.dumps(data)
         query_str = "/{}".format(oid)
         _endpoint = config["endpoint"] + query_str
-        print(_endpoint)
 
         result = self.session.patch(url=_endpoint, data=data_json, headers=raw_headers)
 
@@ -192,7 +191,7 @@ class AzureAd(object):
         lics = _lics.json()
         free_lics = int(lics['prepaidUnits']['enabled']) - int(lics['consumedUnits'])
         if (free_lics) < threshold:
-            liclog.error("O365 remaining licence count is {}. Failed licence count threshold of {}.".format(free_lics,
-                                                                                                            threshold))
+            liclog.error("O365 remaining licence count is {}. "
+                         "Failed free licence threshold of {}.".format(free_lics, threshold))
         else:
             liclog.info("O365 remaining licence count is {}. Licence status OK".format(free_lics))
