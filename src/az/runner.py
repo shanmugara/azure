@@ -23,6 +23,11 @@ def main():
     parser_mon = subparser.add_parser('monitor', help='Monitor free licence')
     parser_mon.add_argument('-t', '--threshold', help='Check threshold', required=False, type=int, default=4)
 
+    group_sync = subparser.add_parser('groupsync', help='Sync AD group to cloud group')
+    group_sync.add_argument('-a', '--adgroup', help='AD group name', required=True, type=str)
+    group_sync.add_argument('-c', '--cloudgroup', help='Cloud group name', required=True, type=str)
+
+
     args = parser.parse_args()
 
     if args:
@@ -39,6 +44,8 @@ def main():
             aad.get_licences_all()
     elif args.command == 'monitor':
         aad.lic_mon(threshold=args.threshold)
+    elif args.command == 'groupsync':
+        aad.sync_group(adgroup=args.adgroup, clgroup=args.cloudgroup)
 
 if __name__ == '__main__':
     main()

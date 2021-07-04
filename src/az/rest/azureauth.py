@@ -7,8 +7,6 @@ import urllib3
 import platform
 import base64
 
-# app_root = os.path.split(os.path.abspath(__file__))[0]
-# sys.path.insert(0, app_root)
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from az.helpers import my_logger
@@ -29,6 +27,7 @@ from urllib3.util.retry import Retry
 class AzureAd(object):
 
     def __init__(self, proxy=config["proxy"]):
+        # Initialize authentication and get token
 
         client_id = config["client_id"]
         client_secret = config["client_secret"]
@@ -66,7 +65,7 @@ class AzureAd(object):
             self.auth = self.app.acquire_token_by_username_password(username, pwd, scopes=scope)
 
         if "access_token" in self.auth:
-            # Calling graph using the access token
+            # Test Calling graph using the access token
             _endpoint = config["apiurl"] + "/users"
             graph_data = requests.get(  # Use token to call downstream service
                 _endpoint,
@@ -80,19 +79,31 @@ class AzureAd(object):
                 # AAD requires user consent for U/P flow
                 log.error("Visit this to consent:", self.app.get_authorization_request_url(config["scope"]))
 
-    def search_user(self, displayname):
+    def get_aad_user(self, displayname=None, loginid=None):
+        """
+        Search for a user by displayname. This is a wildcard search.
+        :param displayname:
+        :param loginid:
+        :return:
+        """
 
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'],
                        "ConsistencyLevel": "eventual"}
 
-        query_str = '?$search="displayName:{}"'.format(displayname)
+        if displayname:
+            query_str = "?$filter=displayName eq '{}'".format(displayname)
+        elif loginid:
+            query_str = "?$filter=startswith(userPrincipalname, '{}@')".format(loginid)
+        else:
+            return
+
         _endpoint = config["apiurl"] + "/users" + query_str
         result = self.session.get(_endpoint,
                                   headers=raw_headers)
         return result.json()
 
     def get_ext_attr(self, displayname):
-        user = self.search_user(displayname=displayname)
+        user = self.get_aad_user(displayname=displayname)
         oid = user['value'][0]['id']
         print(oid)
         query_str = "/{}?$select=extm7dsnjo8_adatumext".format(oid)
@@ -143,6 +154,216 @@ class AzureAd(object):
         result = self.session.post(url=_endpoint, data=data_json, headers=raw_headers)
 
         return result
+
+    def get_aad_group(self, groupname=None):
+        """
+        Get an AAD group properties
+        :param groupname:
+        :return:
+        """
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'],
+                       "ConsistencyLevel": "eventual"}
+
+        if groupname:
+            query_str = "?$filter=displayName eq '{}'".format(groupname)
+        else:
+            query_str = ''
+
+        _endpoint = config["apiurl"] + "/groups" + query_str
+
+        try:
+            result = self.session.get(_endpoint,
+                                      headers=raw_headers)
+            return result.json()
+        except Exception as e:
+            log.error('Exception while getting group from AAD - {}'.format(e))
+            return None
+
+    def make_aad_grp_id_map(self):
+        """
+        create a dict with id:group
+        :return:
+        """
+        self.all_aad_grp_ids = {}
+        _groups = self.get_aad_group()
+        for g in _groups['value']:
+            self.all_aad_grp_ids[g['id']] = g['displayName']
+
+    def get_aad_members(self, groupname):
+        """
+        Get members of an AAD groups
+        :param groupname:
+        :return:
+        """
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token']}
+
+        group_obj = self.get_aad_group(groupname=groupname)
+        if group_obj:
+            gid = group_obj['value'][0]['id']
+            query_str = "/groups/{}/members".format(gid)
+            _endpoint = config['apiurl'] + query_str
+
+            try:
+                result = self.session.get(_endpoint, headers=raw_headers)
+                ret_dict = result.json()
+                ret_dict['group_id'] = gid
+                ret_dict['group_name'] = groupname
+                return ret_dict
+            except Exception as e:
+                log.error('Error while getting group members for "{}" - {}'.format(group_obj, e))
+        else:
+            log.error('Did not get a group object for "{}"'.format(groupname))
+
+    def sync_group(self, adgroup, clgroup):
+        """
+        Get group members from AD synced group and add to cloud group
+        :param adgroup:
+        :param clgroup:
+        :return:
+        """
+        if not hasattr(self, 'all_aad_grp_ids'):
+            self.make_aad_grp_id_map()
+
+        self.adgroup_members = self.get_aad_members(groupname=adgroup)
+        self.cldgroup_members = self.get_aad_members(groupname=clgroup)
+
+        if len(self.adgroup_members['value']) == 0:
+            is_adgroup_null = True
+        else:
+            is_adgroup_null = False
+
+        if len(self.cldgroup_members['value']) == 0:
+            is_cldgroup_null = True
+        else:
+            is_cldgroup_null = False
+
+        adgroup_ids = []
+        self.adgroups_dict = {}
+        if not is_adgroup_null:
+            for id in self.adgroup_members['value']:
+                self.adgroups_dict[id['id']] = id['displayName']
+                adgroup_ids.append(id['id'])
+
+        cldgroup_ids = []
+        self.cldgroups_dict = {}
+        if not is_cldgroup_null:
+            for id in self.cldgroup_members['value']:
+                self.cldgroups_dict[id['id']] = id['displayName']
+                cldgroup_ids.append(id['id'])
+
+        # mem_not_in_cld = set(adgroup_ids) - set(cldgroup_ids)
+        mem_not_in_cld = set(list(self.adgroups_dict.keys())) - set(list(self.cldgroups_dict.keys()))
+        # mem_not_in_ad = set(cldgroup_ids) - set(adgroup_ids)
+        mem_not_in_ad = set(list(self.cldgroups_dict.keys())) - set(list(self.adgroups_dict.keys()))
+
+        log.info('Members list to be removed from cloud group "{}" - {}'.format(clgroup, list(mem_not_in_ad)))
+        log.info('Members list to be added to cloud group "{}" - {}'.format(clgroup, list(mem_not_in_cld)))
+
+        if mem_not_in_cld:
+            log.info('Adding new users {} to cloud group "{}"'.format(list(mem_not_in_cld), clgroup))
+            result = self.add_members_blk(uidlist=list(mem_not_in_cld), gid=self.cldgroup_members['group_id'])
+            log.info('Status code: {}'.format(result.status_code))
+        else:
+            log.info('No new users to be added to group "{}"'.format(clgroup))
+
+        if mem_not_in_ad:
+            log.info('Deleting users {} from cloud group "{}"'.format(list(mem_not_in_ad), clgroup))
+            for uid in list(mem_not_in_ad):
+                log.info('Deleting {}'.format(uid))
+                result = self.remove_member(userid=uid, gid=self.cldgroup_members['group_id'])
+                log.info('Status code: {}'.format(result.status_code))
+        else:
+            log.info('No users need to be removed from cloud group "{}"'.format(clgroup))
+
+        # return mem_not_in_ad, mem_not_in_cld
+
+    def add_member(self, userid, gid):
+        """
+        Add a single user to a group
+        :param userid:
+        :param gid:
+        :return:
+        """
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json",
+                       "Content-length": "30"}
+        query_str = '/groups/{}/members/$ref'.format(gid)
+        _endpoint = config['apiurl'] + query_str
+
+        data_dict = {
+            '@odata.id': config['apiurl'] + '/directoryObjects/{}'.format(userid)
+        }
+        data_json = json.dumps(data_dict)
+        try:
+            result = self.session.post(url=_endpoint, data=data_json, headers=raw_headers)
+            return result
+
+        except Exception as e:
+            log.error('Exception {} while adding users to group "{}"'.format(e, gid))
+            return False
+
+    def add_members_blk(self, uidlist, gid):
+        """
+        Add multiple users to a group
+        :param uidlist:
+        :param gid:
+        :return:
+        """
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
+        _endpoint = config['apiurl'] + '/groups/{}'.format(gid)
+        # log.info(_endpoint)
+
+        data_dict = {"members@odata.bind": []}
+        for uid in uidlist:
+            try:
+                if isinstance(self.all_aad_grp_ids, dict):
+                    grp = self.all_aad_grp_ids[gid]
+                else:
+                    grp = gid
+
+                log.info('ADD: group:{} uid:{} displayName:{}'.format(grp, uid, self.adgroups_dict[uid]))
+            except:
+                pass
+            uid_url = 'https://graph.microsoft.com/v1.0/users/{}'.format(uid)
+            data_dict["members@odata.bind"].append(uid_url)
+
+        data_json = json.dumps(data_dict)
+        # log.info(data_json)
+
+        try:
+            result = self.session.patch(url=_endpoint, data=data_json, headers=raw_headers)
+            return result
+
+        except Exception as e:
+            log.error('Exception while adding users to group "{}"'.format(gid))
+            return False
+
+    def remove_member(self, userid, gid):
+        """
+        Remove a user from group
+        :param userid:
+        :param gid:
+        :return:
+        """
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
+        _endpoint = config['apiurl'] + '/groups/{}/members/{}/$ref'.format(gid, userid)
+
+        try:
+            grp = self.all_aad_grp_ids[gid]
+        except:
+            grp = gid
+
+        try:
+            log.info('REMOVE: group:{} uid:{} displayName:{}'.format(grp, userid, self.cldgroups_dict[userid]))
+        except:
+            pass
+
+        try:
+            result = self.session.delete(url=_endpoint, headers=raw_headers)
+            # log.info(result.status_code)
+            return result
+        except Exception as e:
+            log.error('Exception while deleteing user {} from group {}'.format(userid, gid))
+            return False
 
     def get_open_extensions(self, oid):
         """
