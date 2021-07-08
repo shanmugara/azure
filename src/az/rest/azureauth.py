@@ -17,13 +17,12 @@ if platform.system().lower() == 'windows':
 else:
     LOG_DIR = os.path.join(os.environ['VIRTUAL_ENV'], 'logs', 'azgraph')
 
-log = my_logger.My_logger(logdir=LOG_DIR, logfile='azuread.log')
-liclog = my_logger.My_logger(logdir=LOG_DIR, logfile='licence.log')
+log = my_logger.My_logger(logdir=LOG_DIR, logfile='azuread')
+liclog = my_logger.My_logger(logdir=LOG_DIR, logfile='licence')
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 
-# log.basicConfig(level=log.INFO)
 class AzureAd(object):
 
     def __init__(self, proxy=config["proxy"]):
@@ -47,7 +46,8 @@ class AzureAd(object):
         self.app = msal.ClientApplication(
             client_id,
             authority=authority,
-            client_credential=client_secret
+            client_credential=client_secret,
+            proxies=config['proxy']
         )
 
         self.auth = None
@@ -67,7 +67,7 @@ class AzureAd(object):
         if "access_token" in self.auth:
             # Test Calling graph using the access token
             _endpoint = config["apiurl"] + "/users"
-            graph_data = requests.get(  # Use token to call downstream service
+            graph_data = self.session.get(  # Use token to call downstream service
                 _endpoint,
                 headers={'Authorization': 'Bearer ' + self.auth['access_token']}, ).json()
             # print("Graph API call self.auth: %s" % json.dumps(graph_data, indent=2))
@@ -87,8 +87,7 @@ class AzureAd(object):
         :return:
         """
 
-        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'],
-                       "ConsistencyLevel": "eventual"}
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "ConsistencyLevel": "eventual"}
 
         if displayname:
             query_str = "?$filter=displayName eq '{}'".format(displayname)
@@ -216,7 +215,7 @@ class AzureAd(object):
 
     def sync_group(self, adgroup, clgroup):
         """
-        Get group members from AD synced group and add to cloud group
+        Get group members from AD synced group and add to cloud group, and remove members not in
         :param adgroup:
         :param clgroup:
         :return:
@@ -251,9 +250,7 @@ class AzureAd(object):
                 self.cldgroups_dict[id['id']] = id['displayName']
                 cldgroup_ids.append(id['id'])
 
-        # mem_not_in_cld = set(adgroup_ids) - set(cldgroup_ids)
         mem_not_in_cld = set(list(self.adgroups_dict.keys())) - set(list(self.cldgroups_dict.keys()))
-        # mem_not_in_ad = set(cldgroup_ids) - set(adgroup_ids)
         mem_not_in_ad = set(list(self.cldgroups_dict.keys())) - set(list(self.adgroups_dict.keys()))
 
         log.info('Members list to be removed from cloud group "{}" - {}'.format(clgroup, list(mem_not_in_ad)))
@@ -274,8 +271,6 @@ class AzureAd(object):
                 log.info('Status code: {}'.format(result.status_code))
         else:
             log.info('No users need to be removed from cloud group "{}"'.format(clgroup))
-
-        # return mem_not_in_ad, mem_not_in_cld
 
     def add_member(self, userid, gid):
         """
@@ -310,7 +305,6 @@ class AzureAd(object):
         """
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
         _endpoint = config['apiurl'] + '/groups/{}'.format(gid)
-        # log.info(_endpoint)
 
         data_dict = {"members@odata.bind": []}
         for uid in uidlist:
@@ -327,7 +321,6 @@ class AzureAd(object):
             data_dict["members@odata.bind"].append(uid_url)
 
         data_json = json.dumps(data_dict)
-        # log.info(data_json)
 
         try:
             result = self.session.patch(url=_endpoint, data=data_json, headers=raw_headers)
@@ -382,12 +375,11 @@ class AzureAd(object):
             log.error('Exception while making REST call - {}'.format(e))
             return False
 
-    def get_licences_o365e5(self):
+    def get_sku(self, guid):
         """
         Get a full licence count of E5
         :return:
         """
-        guid = "009ebdb7-1526-4c4e-bdbb-4d6305d2c24e_c7df2760-2c81-4ef7-b578-5b5392b571df"
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
         _endpoint = config["apiurl"] + "/subscribedSkus/{}".format(guid)
 
@@ -413,20 +405,37 @@ class AzureAd(object):
             log.error('Exception while making REST call - {}'.format(e))
             return False
 
-    def lic_mon(self, threshold=5):
+    def licence_map(self):
+        """
+        Create a licence refernce map with string:guid
+        :return:
+        """
+        lics = self.get_licences_all()
+        self.lic_map = {}
+        for l in lics['value']:
+            self.lic_map[l['skuPartNumber'].lower()] = l['id']
+
+    def lic_mon(self, skuname, threshold=5):
         """
         Monitor and report licence thresholds
         :param threshold:
         :return:
         """
-        _lics = self.get_licences_o365e5()
+        if not hasattr(self, 'lic_map'):
+            self.licence_map()
+        if skuname.lower() in self.lic_map.keys():
+            _lics = self.get_sku(self.lic_map[skuname.lower()])
+        else:
+            log.error('Invlid SKU name, or SKU {} doesnt exist in organization'.format(skuname.upper()))
+            return False
+
         if not _lics:
             liclog.error('Failed to get licence data')
             return
         lics = _lics.json()
         free_lics = int(lics['prepaidUnits']['enabled']) - int(lics['consumedUnits'])
         if (free_lics) < threshold:
-            liclog.error("O365 remaining licence count is {}. "
-                         "Failed free licence threshold of {}.".format(free_lics, threshold))
+            liclog.error("{} remaining licence count is {}. "
+                         "Failed free licence threshold of {}.".format(skuname.upper(), free_lics, threshold))
         else:
-            liclog.info("O365 remaining licence count is {}. Licence status OK".format(free_lics))
+            liclog.info("{} remaining licence count is {}. Licence status OK".format(skuname.upper(), free_lics))

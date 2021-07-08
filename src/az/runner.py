@@ -13,15 +13,16 @@ def main():
 
     :return:
     """
+    sku_list = ['EMSPREMIUM', 'OFFICESUBSCRIPTION', 'ENTERPRISEPACK', 'ENTERPRISEPREMIUM']
     parser = argparse.ArgumentParser(description="Azure Graph API runner")
 
     subparser = parser.add_subparsers(dest='command')
-    parse_lic = subparser.add_parser('licence', help='Check licence')
-    parse_lic.add_argument('-f', '--free', help='Get free count', required=False)
-    parse_lic.add_argument('-s', '--sku', help='SKU name', required=True, default='all')
+    parse_lic = subparser.add_parser('licence', help='Check licence data')
+    parse_lic.add_argument('-g', '--guid', help='SKU guid', required=True, default='all')
 
     parser_mon = subparser.add_parser('monitor', help='Monitor free licence')
     parser_mon.add_argument('-t', '--threshold', help='Check threshold', required=False, type=int, default=4)
+    parser_mon.add_argument('-s', '--skuname', help='SKU Part name of the product', required=True, choices=sku_list)
 
     group_sync = subparser.add_parser('groupsync', help='Sync AD group to cloud group')
     group_sync.add_argument('-a', '--adgroup', help='AD group name', required=True, type=str)
@@ -36,14 +37,12 @@ def main():
         return False
 
     if args.command == 'licence':
-        if args.sku == 'all':
+        if args.guid == 'all':
             aad.get_licences_all()
-        elif args.sku == 'o365':
-            aad.get_licences_o365e5()
         else:
-            aad.get_licences_all()
+            aad.get_sku(guid=args.guid)
     elif args.command == 'monitor':
-        aad.lic_mon(threshold=args.threshold)
+        aad.lic_mon(skuname=args.skuname, threshold=args.threshold)
     elif args.command == 'groupsync':
         aad.sync_group(adgroup=args.adgroup, clgroup=args.cloudgroup)
 
