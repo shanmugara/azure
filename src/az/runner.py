@@ -18,7 +18,7 @@ def main():
 
     subparser = parser.add_subparsers(dest='command')
     parse_lic = subparser.add_parser('licence', help='Check licence data')
-    parse_lic.add_argument('-g', '--guid', help='SKU guid', required=True, default='all')
+    parse_lic.add_argument('-g', '--guid', help='SKU guid', required=True, default=None)
 
     parser_mon = subparser.add_parser('monitor', help='Monitor free licence')
     parser_mon.add_argument('-t', '--threshold', help='Check threshold', required=False, type=int, default=4)
@@ -37,10 +37,7 @@ def main():
         return False
 
     if args.command == 'licence':
-        if args.guid == 'all':
-            aad.get_licences_all()
-        else:
-            aad.get_sku(guid=args.guid)
+        aad.get_licences_all(guid=args.guid)
     elif args.command == 'monitor':
         aad.lic_mon(skuname=args.skuname, threshold=args.threshold)
     elif args.command == 'groupsync':

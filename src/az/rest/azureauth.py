@@ -375,28 +375,15 @@ class AzureAd(object):
             log.error('Exception while making REST call - {}'.format(e))
             return False
 
-    def get_sku(self, guid):
-        """
-        Get a full licence count of E5
-        :return:
-        """
-        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
-        _endpoint = config["apiurl"] + "/subscribedSkus/{}".format(guid)
-
-        try:
-            result = self.session.get(url=_endpoint, headers=raw_headers)
-            return result
-        except Exception as e:
-            log.error('Exception while making REST call - {}'.format(e))
-            return False
-
-    def get_licences_all(self):
+    def get_licences_all(self, guid=None):
         """
         Get a full licence count
         :return:
         """
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
         _endpoint = config["apiurl"] + "/subscribedSkus"
+        if guid:
+            _endpoint += '/{}'.format(guid)
 
         try:
             result = self.session.get(url=_endpoint, headers=raw_headers)
@@ -424,15 +411,15 @@ class AzureAd(object):
         if not hasattr(self, 'lic_map'):
             self.licence_map()
         if skuname.lower() in self.lic_map.keys():
-            _lics = self.get_sku(self.lic_map[skuname.lower()])
+            lics = self.get_licences_all(guid=self.lic_map[skuname.lower()])
         else:
-            log.error('Invlid SKU name, or SKU {} doesnt exist in organization'.format(skuname.upper()))
+            log.error('Invalid SKU name, or SKU {} doesnt exist in organization'.format(skuname.upper()))
             return False
 
-        if not _lics:
+        if not lics:
             liclog.error('Failed to get licence data')
             return
-        lics = _lics.json()
+
         free_lics = int(lics['prepaidUnits']['enabled']) - int(lics['consumedUnits'])
         if (free_lics) < threshold:
             liclog.error("{} remaining licence count is {}. "
