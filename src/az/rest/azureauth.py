@@ -457,7 +457,7 @@ class AzureAd(object):
 
     def report_license_activation(self):
         """
-        Activation report
+        Generate Activation report dict
         :return:
         """
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
