@@ -25,6 +25,17 @@ from urllib3.util.retry import Retry
 
 class AzureAd(object):
 
+    class DupObj(object):
+        def __init__(self, name):
+            self.name = name
+
+        def __repr__(self):
+            return self.name
+
+        def __str__(self):
+            return self.name
+
+
     def __init__(self, proxy=config["proxy"]):
         # Initialize authentication and get token
 
@@ -426,3 +437,57 @@ class AzureAd(object):
                          "Failed free licence threshold of {}.".format(skuname.upper(), free_lics, threshold))
         else:
             liclog.info("{} remaining licence count is {}. Licence status OK".format(skuname.upper(), free_lics))
+
+    def get_user_license(self, uid):
+        """
+        Get license details for teh given user
+        :param uid:
+        :return:
+        """
+
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
+        _endpoint = config["apiurl"] + "/users/{}/licenseDetails".format(uid)
+
+        try:
+            result = self.session.get(url=_endpoint, headers=raw_headers)
+            return result.json()
+        except Exception as e:
+            log.error('Exception while making REST call - {}'.format(e))
+            return False
+
+    def report_license_activation(self):
+        """
+        Activation report
+        :return:
+        """
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
+        _endpoint = config["apiurl"] + "/reports/getOffice365ActivationsUserDetail"
+
+        try:
+            result = self.session.get(url=_endpoint, headers=raw_headers)
+            raw_l = result.text.splitlines()
+            raw_l.pop(0)
+            raw_dict = {}
+            for i in raw_l:
+                date,upn,disp,p_type,last_act,win,mac,win10m,ios,android,shared = i.split(',')
+                u_o = self.DupObj(upn)
+                raw_dict[u_o] = {}
+                raw_dict[u_o]['display_name'] = disp
+                raw_dict[u_o]['product_type'] = p_type
+                raw_dict[u_o]['last_activated'] = last_act
+                raw_dict[u_o]['windows'] = win
+                raw_dict[u_o]['macos'] = mac
+                raw_dict[u_o]['win10mobile'] = win10m
+                raw_dict[u_o]['ios'] = ios
+                raw_dict[u_o]['android'] = android
+                raw_dict[u_o]['sharedcomp'] = shared
+
+            return raw_dict
+        except Exception as e:
+            log.error('Exception while making REST call - {}'.format(e))
+            return False
+
+
+
+
+
