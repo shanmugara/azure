@@ -7,10 +7,14 @@ import urllib3
 import platform
 import base64
 
+from cryptography.x509 import load_pem_x509_certificate
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from az.helpers import my_logger
-from az.helpers.config import config
+from az.helpers.config import config, app_secret, cert_key_path, cert_path
 
 if platform.system().lower() == 'windows':
     LOG_DIR = os.path.join('c:\\', 'logs', 'azgraph')
@@ -24,7 +28,6 @@ from urllib3.util.retry import Retry
 
 
 class AzureAd(object):
-
     class DupObj(object):
         def __init__(self, name):
             self.name = name
@@ -35,7 +38,6 @@ class AzureAd(object):
         def __str__(self):
             return self.name
 
-
     def __init__(self, proxy=config["proxy"]):
         # Initialize authentication and get token
 
@@ -43,8 +45,13 @@ class AzureAd(object):
         client_secret = config["client_secret"]
         scope = config["scope"]
         authority = config["authority"]
-        username = config["username"]
-        pwd = base64.b64decode(config['password'].decode("utf-8")).decode()
+
+        if config["cert_auth"]:
+            client_credentials = self.get_cert_creds()
+        else:
+            username = config["username"]
+            pwd = base64.b64decode(config['password'].decode("utf-8")).decode()
+            client_credentials = client_secret
 
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         self.session = requests.Session()
@@ -57,7 +64,7 @@ class AzureAd(object):
         self.app = msal.ClientApplication(
             client_id,
             authority=authority,
-            client_credential=client_secret,
+            client_credential=client_credentials,
             proxies=config['proxy']
         )
 
@@ -90,11 +97,39 @@ class AzureAd(object):
                 # AAD requires user consent for U/P flow
                 log.error("Visit this to consent:", self.app.get_authorization_request_url(config["scope"]))
 
-    def get_aad_user(self, displayname=None, loginid=None):
+    def get_cert_creds(self):
+        """
+        Get cert creds dict
+        :return:
+        """
+        if all([os.path.isfile(cert_path), os.path.isfile(cert_key_path)]):
+            with open(cert_path) as f:
+                cert_file = f.read()
+            with open(cert_key_path) as f:
+                key_file = f.read()
+
+                # Create an X509 object and calculate the thumbprint
+                cert_obj = load_pem_x509_certificate(data=bytes(cert_file, 'UTF-8'), backend=default_backend())
+                thumbprint = (cert_obj.fingerprint(hashes.SHA1()).hex())
+
+                client_credential = {
+                    "private_key": key_file,
+                    "thumbprint": thumbprint,
+                    "public_certificate": cert_file
+                }
+
+                return client_credential
+
+        else:
+            log.error('Missing cert/cert_key files')
+            return False
+
+    def get_aad_user(self, displayname=None, loginid=None, onprem=False):
         """
         Search for a user by displayname. This is a wildcard search.
-        :param displayname:
-        :param loginid:
+        :param displayname: display name
+        :param loginid: samaccountname
+        :param onprem: get only on prem synced accounts
         :return:
         """
 
@@ -105,12 +140,34 @@ class AzureAd(object):
         elif loginid:
             query_str = "?$filter=startswith(userPrincipalname, '{}@')".format(loginid)
         else:
-            return
-
+            filter = "?$select=onPremisesSyncEnabled,id,userPrincipalName,businessPhones,displayName,givenName," \
+                     "jobTitle,mail,mobilePhone,officeLocation,surname"
+            query_str = filter
+        page = True
+        allusers_full = []
         _endpoint = config["apiurl"] + "/users" + query_str
-        result = self.session.get(_endpoint,
-                                  headers=raw_headers)
-        return result.json()
+
+        while page:
+            result = self.session.get(_endpoint,
+                                      headers=raw_headers)
+            users_dict = result.json()
+            users_list = users_dict['value']
+            allusers_full.extend(users_list)
+            if '@odata.nextLink' in users_dict.keys():
+                _endpoint = users_dict['@odata.nextLink']
+            else:
+                page = False
+
+        allusers = []
+
+        if onprem:
+            for u in allusers_full:
+                if u['onPremisesSyncEnabled'] == True:
+                    allusers.append(u)
+        else:
+            allusers = allusers_full
+
+        return allusers
 
     def get_ext_attr(self, displayname):
         user = self.get_aad_user(displayname=displayname)
@@ -469,7 +526,7 @@ class AzureAd(object):
             raw_l.pop(0)
             raw_dict = {}
             for i in raw_l:
-                date,upn,disp,p_type,last_act,win,mac,win10m,ios,android,shared = i.split(',')
+                date, upn, disp, p_type, last_act, win, mac, win10m, ios, android, shared = i.split(',')
                 u_o = self.DupObj(upn)
                 raw_dict[u_o] = {}
                 raw_dict[u_o]['display_name'] = disp
@@ -482,12 +539,7 @@ class AzureAd(object):
                 raw_dict[u_o]['android'] = android
                 raw_dict[u_o]['sharedcomp'] = shared
 
-            return raw_dict
+            return raw_dict, result
         except Exception as e:
             log.error('Exception while making REST call - {}'.format(e))
             return False
-
-
-
-
-
