@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='azuregraph',
-      version="0.0.1",
+      version="0.0.2",
       description='Azure Graph API wrapper.',
       url='https://none.none',
       author='RP',

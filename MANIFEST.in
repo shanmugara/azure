@@ -1,3 +1,3 @@
-recursive-include az/rest *
-recursive-include az/helpers *
-recursive-include az/*
+recursive-include src/az/rest *
+recursive-include src/az/helpers *
+recursive-include src/az/*
