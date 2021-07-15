@@ -10,8 +10,7 @@ def get_adgroupmember(groupname):
     :return:
     """
     cmd = os.path.join(app_root, 'admodule.ps1')
-    ps_arg = '-c {} -groupname {})'.format(cmd, groupname)
-    cmd_out = check_output(['powershell',ps_arg])
+    cmd_out = check_output(['powershell','-c',cmd,'-groupname',groupname])
     mems_lines = cmd_out.decode().splitlines()
 
     return mems_lines
