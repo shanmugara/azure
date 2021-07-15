@@ -6,6 +6,7 @@ import sys
 import urllib3
 import platform
 import base64
+import re
 
 from cryptography.x509 import load_pem_x509_certificate
 from cryptography.hazmat.backends import default_backend
@@ -525,8 +526,16 @@ class AzureAd(object):
             raw_l = result.text.splitlines()
             raw_l.pop(0)
             raw_dict = {}
+            re_pat = re.compile('".+"')
             for i in raw_l:
-                date, upn, disp, p_type, last_act, win, mac, win10m, ios, android, shared = i.split(',')
+                print(i)
+                if re.search(re_pat, i):
+                    line = re.sub(re_pat, '', i)
+                    date, upn, disp, p_type, last_act, win, mac, win10m, ios, android, shared = i.split(',')
+                    disp = re.search(re_pat, i).group()
+                else:
+                    date, upn, disp, p_type, last_act, win, mac, win10m, ios, android, shared = i.split(',')
+
                 u_o = self.DupObj(upn)
                 raw_dict[u_o] = {}
                 raw_dict[u_o]['display_name'] = disp
