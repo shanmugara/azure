@@ -1,5 +1,7 @@
-from subprocess import check_output, DEVNULL
-import json
+from subprocess import check_output
+import os
+
+app_root = os.path.split(os.path.abspath(__file__))[0]
 
 def get_adgroupmember(groupname):
     """
@@ -7,7 +9,9 @@ def get_adgroupmember(groupname):
     :param groupname:
     :return:
     """
-    ps_arg = 'convertto-json(get-adgroupmember {})'.format(groupname)
+    cmd = os.path.join(app_root, 'admodule.ps1')
+    ps_arg = '-c {} -groupname {})'.format(cmd, groupname)
     cmd_out = check_output(['powershell',ps_arg])
-    cmd_out_dict = json.loads(cmd_out)
-    return cmd_out_dict
+    mems_lines = cmd_out.decode().splitlines()
+
+    return mems_lines
