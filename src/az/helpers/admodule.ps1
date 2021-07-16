@@ -14,6 +14,7 @@ function get-groupmembers {
             return $samname
         }
     catch {
+            write-host "failed_to_get_members"
             return $false
         }
 }
