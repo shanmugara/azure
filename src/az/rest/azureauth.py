@@ -339,7 +339,7 @@ class AzureAd(object):
 
         # add missing members to cld group
         if mem_not_in_cld:
-            log.info('Adding new users {} to cloud group "{}"'.format(list(mem_not_in_cld), clgroup))
+            log.info('Adding new members {} to cloud group "{}"'.format(list(mem_not_in_cld), clgroup))
 
             mem_to_add_to_cld = []
 
@@ -355,11 +355,11 @@ class AzureAd(object):
                 result = self.add_members_blk(uidlist=mem_to_add_to_cld, gid=self.cldgroup_members_full['group_id'])
                 log.info('Status code: {}'.format(result.status_code))
         else:
-            log.info('No new users to be added to group "{}"'.format(clgroup))
+            log.info('No new members to be added to group "{}"'.format(clgroup))
 
         log.info('Members list to be removed from cloud group "{}" - {}'.format(clgroup, list(mem_not_in_ad)))
         if mem_not_in_ad:
-            log.info('Deleting users {} from cloud group "{}"'.format(list(mem_not_in_ad), clgroup))
+            log.info('Deleting members {} from cloud group "{}"'.format(list(mem_not_in_ad), clgroup))
             for s_upn in list(mem_not_in_ad):
                 log.info('Deleting {}'.format(s_upn))
 
@@ -373,7 +373,7 @@ class AzureAd(object):
                     log.error('Exception was thrown while removing id: {} from group: {}'.format(s_upn, clgroup))
 
         else:
-            log.info('No users need to be removed from cloud group "{}"'.format(clgroup))
+            log.info('No members need to be removed from cloud group "{}"'.format(clgroup))
 
     def add_member(self, userid, gid):
         """
