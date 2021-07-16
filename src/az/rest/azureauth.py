@@ -362,6 +362,9 @@ class AzureAd(object):
             self.aad_user_upn_map(onprem=True)
 
         adgroup_members = powershell.get_adgroupmember(groupname=adgroup)
+        if adgroup_members == False:
+            log.error('Unable to get on-prem AD group members for "{}". Check group name. Exiting.'.format(adgroup))
+            return False
 
         self.cldgroup_members_full = self.get_aad_members(groupname=clgroup)
 
