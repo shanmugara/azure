@@ -369,8 +369,9 @@ class AzureAd(object):
                                                                                                                   clgroup))
 
             # result = self.add_members_blk(uidlist=list(mem_not_in_cld), gid=self.cldgroup_members_full['group_id'])
-            result = self.add_members_blk(uidlist=mem_to_add_to_cld, gid=self.cldgroup_members_full['group_id'])
-            log.info('Status code: {}'.format(result.status_code))
+            if mem_to_add_to_cld:
+                result = self.add_members_blk(uidlist=mem_to_add_to_cld, gid=self.cldgroup_members_full['group_id'])
+                log.info('Status code: {}'.format(result.status_code))
         else:
             log.info('No new users to be added to group "{}"'.format(clgroup))
 
