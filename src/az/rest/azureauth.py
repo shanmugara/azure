@@ -44,6 +44,7 @@ class AzureAd(object):
 
     class Timer(object):
         """Generic timer"""
+
         @staticmethod
         def add_timer(func):
             functools.wraps(func)
@@ -397,8 +398,9 @@ class AzureAd(object):
 
             if mem_to_add_to_cld:
                 log.info(
-                    'Adding new members {} to cloud group "{}"'.format(list(set(mem_not_in_cld) - set(list(not_in_aad))),
-                                                                       clgroup))
+                    'Adding new members {} to cloud group "{}"'.format(
+                        list(set(mem_not_in_cld) - set(list(not_in_aad))),
+                        clgroup))
                 result = self.add_members_blk(uidlist=mem_to_add_to_cld, gid=self.cldgroup_members_full['group_id'])
                 if result:
                     log.info('Bulk add result code: OK')
@@ -415,7 +417,8 @@ class AzureAd(object):
 
                 try:
                     result = self.remove_member(userid=self.upn_id_map[s_upn],
-                                                gid=self.cldgroup_members_full['group_id'])
+                                                gid=self.cldgroup_members_full['group_id'],
+                                                grpname=clgroup)
                     log.info('Status code: {}'.format(result.status_code))
                 except KeyError:
                     log.error('Unable to find adsynced user {} in azure ad'.format(s_upn))
@@ -458,10 +461,6 @@ class AzureAd(object):
         :param gid:
         :return:
         """
-        # raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
-        # _endpoint = config['apiurl'] + '/groups/{}'.format(gid)
-        #
-        # data_dict = {"members@odata.bind": []}
 
         ret_result = True
         if len(uidlist) > 20:
@@ -478,28 +477,15 @@ class AzureAd(object):
                     ret_result = False
         else:
             result = self.add_mem_blk_sub(uidlist=uidlist, gid=gid)
+            log.info('Status code:{}'.format(result.status_code))
             if result == False: return False
+
             if result.status_code != int(204):
+                log.error('Status code:{}'.format(result.status_code))
                 ret_result = False
 
         return ret_result
 
-        # for uid in uidlist:
-        #     try:
-        #         uid_url = 'https://graph.microsoft.com/v1.0/users/{}'.format(uid)
-        #         data_dict["members@odata.bind"].append(uid_url)
-        #     except Exception as e:
-        #         log.info('Exception {} in add_members_blk'.format(e))
-        #
-        # data_json = json.dumps(data_dict)
-        #
-        # try:
-        #     result = self.session.patch(url=_endpoint, data=data_json, headers=raw_headers)
-        #     return result
-        #
-        # except Exception as e:
-        #     log.error('Exception while adding users to group "{}"'.format(gid))
-        #     return False
 
     def add_mem_blk_sub(self, uidlist, gid):
         """
@@ -529,9 +515,8 @@ class AzureAd(object):
             log.error('Exception while adding users to group "{}"'.format(gid))
             return False
 
-
     @Timer.add_timer
-    def remove_member(self, userid, gid):
+    def remove_member(self, userid, gid, grpname=''):
         """
         Remove a user from group
         :param userid:
@@ -541,19 +526,18 @@ class AzureAd(object):
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
         _endpoint = config['apiurl'] + '/groups/{}/members/{}/$ref'.format(gid, userid)
 
-        try:
-            grp = self.all_aad_grp_ids[gid]
-        except:
-            grp = gid
+        # try:
+        #     grp = self.all_aad_grp_ids[gid]
+        # except:
+        #     grp = gid
 
         try:
-            log.info('REMOVE: group:{} uid:{} displayName:{}'.format(grp, userid, self.cldgroups_dict[userid]))
+            log.info('REMOVE member: group:{} uid:{}'.format(grpname, userid))
         except:
             pass
 
         try:
             result = self.session.delete(url=_endpoint, headers=raw_headers)
-            # log.info(result.status_code)
             return result
         except Exception as e:
             log.error('Exception while deleteing user {} from group {}'.format(userid, gid))
