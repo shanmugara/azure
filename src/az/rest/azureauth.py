@@ -294,15 +294,35 @@ class AzureAd(object):
             gid = group_obj['value'][0]['id']
             query_str = "/groups/{}/members".format(gid)
             _endpoint = config['apiurl'] + query_str
+            page = True
+            ret_dict = {}
+            ret_dict['group_id'] = gid
+            ret_dict['group_name'] = groupname
+            ret_dict['value'] = []
 
-            try:
-                result = self.session.get(_endpoint, headers=raw_headers)
-                ret_dict = result.json()
-                ret_dict['group_id'] = gid
-                ret_dict['group_name'] = groupname
-                return ret_dict
-            except Exception as e:
-                log.error('Error while getting group members for "{}" - {}'.format(group_obj, e))
+            while page:
+                try:
+                    result = self.session.get(_endpoint, headers=raw_headers)
+                    ret_dict['value'].extend(result.json()['value'])
+                    if '@odata.nextLink' in result.json().keys():
+                        _endpoint = result.json()['@odata.nextLink']
+                    else:
+                        page = False
+
+                except Exception as e:
+                    log.error('Error while getting group members for "{}" - {}'.format(group_obj, e))
+                    page = False
+
+            return ret_dict
+
+            # try:
+            #     result = self.session.get(_endpoint, headers=raw_headers)
+            #     ret_dict = result.json()
+            #     ret_dict['group_id'] = gid
+            #     ret_dict['group_name'] = groupname
+            #     return ret_dict
+            # except Exception as e:
+            #     log.error('Error while getting group members for "{}" - {}'.format(group_obj, e))
         else:
             log.error('Did not get a group object for "{}"'.format(groupname))
 
