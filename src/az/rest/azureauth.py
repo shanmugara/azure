@@ -322,19 +322,16 @@ class AzureAd(object):
         else:
             is_cldgroup_null = False
 
-        # cldgroup_ids = []
         cldgroup_members = []
 
         if not is_cldgroup_null:
             for user in self.cldgroup_members_full['value']:
                 cld_upn_short = user['userPrincipalName'].split('@')[0].lower()
-                # cldgroup_ids.append(user['id'])
                 cldgroup_members.append(cld_upn_short.lower())
 
         mem_not_in_cld = set(adgroup_members) - set(cldgroup_members)
         mem_not_in_ad = set(cldgroup_members) - set(adgroup_members)
 
-        # log.info('Members list to be removed from cloud group "{}" - {}'.format(clgroup, list(mem_not_in_ad)))
         log.info('Members list to be added to cloud group "{}" - {}'.format(clgroup, list(mem_not_in_cld)))
 
         # add missing members to cld group
@@ -370,7 +367,7 @@ class AzureAd(object):
                 except KeyError:
                     log.error('Unable to find adsynced user {} in azure ad'.format(s_upn))
                 except Exception as e:
-                    log.error('Exception was thrown while removing id: {} from group: {}'.format(s_upn, clgroup))
+                    log.error('Exception "{}" was thrown while removing id: {} from group: {}'.format(e, s_upn, clgroup))
 
         else:
             log.info('No members need to be removed from cloud group "{}"'.format(clgroup))
@@ -417,7 +414,7 @@ class AzureAd(object):
                 else:
                     grp = gid
 
-                log.info('ADD: group:{} uid:{} displayName:{}'.format(grp, uid, self.adgroups_dict[uid]))
+                log.info('ADD: group:{} uid:{} displayName:{}'.format(grp, uid, self.all_aad_grp_ids[uid]))
             except:
                 pass
             uid_url = 'https://graph.microsoft.com/v1.0/users/{}'.format(uid)
