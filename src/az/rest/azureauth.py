@@ -336,8 +336,6 @@ class AzureAd(object):
 
         # add missing members to cld group
         if mem_not_in_cld:
-            log.info('Adding new members {} to cloud group "{}"'.format(list(mem_not_in_cld), clgroup))
-
             mem_to_add_to_cld = []
 
             for u in list(mem_not_in_cld):
@@ -345,10 +343,11 @@ class AzureAd(object):
                     mem_to_add_to_cld.append(self.upn_id_map[u])
                 except KeyError:
                     log.error(
-                        'adsynced user id: {} was not found azure ad. '
-                        'User will not be added to group: {}'.format(u, clgroup))
+                        'ad-synced user id: {} was not found in azure ad. '
+                        'This user will not be added to group: {}'.format(u, clgroup))
 
             if mem_to_add_to_cld:
+                log.info('Adding new members {} to cloud group "{}"'.format(mem_to_add_to_cld, clgroup))
                 result = self.add_members_blk(uidlist=mem_to_add_to_cld, gid=self.cldgroup_members_full['group_id'])
                 log.info('Status code: {}'.format(result.status_code))
         else:
@@ -367,7 +366,8 @@ class AzureAd(object):
                 except KeyError:
                     log.error('Unable to find adsynced user {} in azure ad'.format(s_upn))
                 except Exception as e:
-                    log.error('Exception "{}" was thrown while removing id: {} from group: {}'.format(e, s_upn, clgroup))
+                    log.error(
+                        'Exception "{}" was thrown while removing id: {} from group: {}'.format(e, s_upn, clgroup))
 
         else:
             log.info('No members need to be removed from cloud group "{}"'.format(clgroup))
