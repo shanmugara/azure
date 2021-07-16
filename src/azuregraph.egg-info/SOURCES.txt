@@ -4,7 +4,6 @@ src/az/__init__.py
 src/az/runner.py
 src/az/helpers/__init__.py
 src/az/helpers/admodule.ps1
-src/az/helpers/config.py
 src/az/helpers/my_logger.py
 src/az/helpers/mytest.xml
 src/az/helpers/powershell.py

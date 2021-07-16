@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 
 from az.helpers import my_logger
 from az.helpers.config import config, app_secret, cert_key_path, cert_path
+from az.helpers import powershell
 
 if platform.system().lower() == 'windows':
     LOG_DIR = os.path.join('c:\\', 'logs', 'azgraph')
@@ -282,6 +283,22 @@ class AzureAd(object):
         else:
             log.error('Did not get a group object for "{}"'.format(groupname))
 
+    def aad_user_upn_map(self, onprem=True):
+        """
+        Create a dict with user upn without @xxx.xxx.xxx and id
+        :return:
+        """
+        all_aad_users = self.get_aad_user(onprem=onprem)
+        self.upn_id_map = {}
+
+        if all_aad_users:
+            for u in all_aad_users:
+                upn_short = u['userPrincipalName'].split('@')[0].lower()
+                self.upn_id_map[upn_short] = u['id']
+        else:
+            log.error('Failed to get users list from AAD')
+            return False
+
     def sync_group(self, adgroup, clgroup):
         """
         Get group members from AD synced group and add to cloud group, and remove members not in
@@ -292,52 +309,85 @@ class AzureAd(object):
         if not hasattr(self, 'all_aad_grp_ids'):
             self.make_aad_grp_id_map()
 
-        self.adgroup_members = self.get_aad_members(groupname=adgroup)
-        self.cldgroup_members = self.get_aad_members(groupname=clgroup)
+        if not hasattr(self, 'upn_id_map'):
+            self.aad_user_upn_map(onprem=True)
 
-        if len(self.adgroup_members['value']) == 0:
-            is_adgroup_null = True
-        else:
-            is_adgroup_null = False
+        # self.adgroup_members = self.get_aad_members(groupname=adgroup)
+        adgroup_members = powershell.get_adgroupmember(groupname=adgroup)
 
-        if len(self.cldgroup_members['value']) == 0:
+        self.cldgroup_members_full = self.get_aad_members(groupname=clgroup)
+
+        # if len(self.adgroup_members['value']) == 0:
+        #     is_adgroup_null = True
+        # else:
+        #     is_adgroup_null = False
+
+        is_adgroup_null = False if adgroup_members else True
+
+        if len(self.cldgroup_members_full['value']) == 0:
             is_cldgroup_null = True
         else:
             is_cldgroup_null = False
 
-        adgroup_ids = []
-        self.adgroups_dict = {}
-        if not is_adgroup_null:
-            for id in self.adgroup_members['value']:
-                self.adgroups_dict[id['id']] = id['displayName']
-                adgroup_ids.append(id['id'])
+        # adgroup_ids = []
+        # self.adgroups_dict = {}
+        # if not is_adgroup_null:
+        #     for id in self.adgroup_members['value']:
+        #         self.adgroups_dict[id['id']] = id['displayName']
+        #         adgroup_ids.append(id['id'])
 
         cldgroup_ids = []
-        self.cldgroups_dict = {}
+        cldgroup_members = []
+        # self.cldgroups_dict = {}
         if not is_cldgroup_null:
-            for id in self.cldgroup_members['value']:
-                self.cldgroups_dict[id['id']] = id['displayName']
-                cldgroup_ids.append(id['id'])
+            for user in self.cldgroup_members_full['value']:
+                # self.cldgroups_dict[id['id']] = id['displayName']
+                cld_upn_short = user['userPrincipalName'].split('@')[0].lower()
+                cldgroup_ids.append(user['id'])
+                cldgroup_members.append(cld_upn_short.lower())
 
-        mem_not_in_cld = set(list(self.adgroups_dict.keys())) - set(list(self.cldgroups_dict.keys()))
-        mem_not_in_ad = set(list(self.cldgroups_dict.keys())) - set(list(self.adgroups_dict.keys()))
+        # mem_not_in_cld = set(list(self.adgroups_dict.keys())) - set(list(self.cldgroups_dict.keys()))
+        mem_not_in_cld = set(adgroup_members) - set(cldgroup_members)
+        # mem_not_in_ad = set(list(self.cldgroups_dict.keys())) - set(list(self.adgroups_dict.keys()))
+        mem_not_in_ad = set(cldgroup_members) - set(adgroup_members)
 
         log.info('Members list to be removed from cloud group "{}" - {}'.format(clgroup, list(mem_not_in_ad)))
         log.info('Members list to be added to cloud group "{}" - {}'.format(clgroup, list(mem_not_in_cld)))
 
+        # add missing members to cld group
         if mem_not_in_cld:
             log.info('Adding new users {} to cloud group "{}"'.format(list(mem_not_in_cld), clgroup))
-            result = self.add_members_blk(uidlist=list(mem_not_in_cld), gid=self.cldgroup_members['group_id'])
+
+            mem_to_add_to_cld = []
+
+            for u in list(mem_not_in_cld):
+                try:
+                    mem_to_add_to_cld.append(self.upn_id_map[u])
+                except KeyError:
+                    log.error(
+                        'adsynced user id: {} was not found azure ad. User will not be added to group: {}'.format(u,
+                                                                                                                  clgroup))
+
+            # result = self.add_members_blk(uidlist=list(mem_not_in_cld), gid=self.cldgroup_members_full['group_id'])
+            result = self.add_members_blk(uidlist=mem_to_add_to_cld, gid=self.cldgroup_members_full['group_id'])
             log.info('Status code: {}'.format(result.status_code))
         else:
             log.info('No new users to be added to group "{}"'.format(clgroup))
 
         if mem_not_in_ad:
             log.info('Deleting users {} from cloud group "{}"'.format(list(mem_not_in_ad), clgroup))
-            for uid in list(mem_not_in_ad):
-                log.info('Deleting {}'.format(uid))
-                result = self.remove_member(userid=uid, gid=self.cldgroup_members['group_id'])
-                log.info('Status code: {}'.format(result.status_code))
+            for s_upn in list(mem_not_in_ad):
+                log.info('Deleting {}'.format(s_upn))
+
+                try:
+                    result = self.remove_member(userid=self.upn_id_map[s_upn],
+                                                gid=self.cldgroup_members_full['group_id'])
+                    log.info('Status code: {}'.format(result.status_code))
+                except KeyError:
+                    log.error('Unable to find adsynced user {} in azure ad'.format(s_upn))
+                except Exception as e:
+                    log.error('Exception was thrown while removing id: {} from group: {}'.format(s_upn, clgroup))
+
         else:
             log.info('No users need to be removed from cloud group "{}"'.format(clgroup))
 
