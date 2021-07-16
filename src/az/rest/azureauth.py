@@ -334,7 +334,7 @@ class AzureAd(object):
         mem_not_in_cld = set(adgroup_members) - set(cldgroup_members)
         mem_not_in_ad = set(cldgroup_members) - set(adgroup_members)
 
-        log.info('Members list to be removed from cloud group "{}" - {}'.format(clgroup, list(mem_not_in_ad)))
+        # log.info('Members list to be removed from cloud group "{}" - {}'.format(clgroup, list(mem_not_in_ad)))
         log.info('Members list to be added to cloud group "{}" - {}'.format(clgroup, list(mem_not_in_cld)))
 
         # add missing members to cld group
@@ -357,6 +357,7 @@ class AzureAd(object):
         else:
             log.info('No new users to be added to group "{}"'.format(clgroup))
 
+        log.info('Members list to be removed from cloud group "{}" - {}'.format(clgroup, list(mem_not_in_ad)))
         if mem_not_in_ad:
             log.info('Deleting users {} from cloud group "{}"'.format(list(mem_not_in_ad), clgroup))
             for s_upn in list(mem_not_in_ad):
