@@ -150,8 +150,7 @@ class AzureAd(object):
         _endpoint = config["apiurl"] + "/users" + query_str
 
         while page:
-            result = self.session.get(_endpoint,
-                                      headers=raw_headers)
+            result = self.session.get(_endpoint, headers=raw_headers)
             users_dict = result.json()
             users_list = users_dict['value']
             allusers_full.extend(users_list)
@@ -301,9 +300,10 @@ class AzureAd(object):
 
     def sync_group(self, adgroup, clgroup):
         """
-        Get group members from AD synced group and add to cloud group, and remove members not in
-        :param adgroup:
-        :param clgroup:
+        Get group members from AD synced group and add to cloud group, and remove members not in ad group.
+        ad group is retrieved from on-prem ad. required quest powershell module for ad.
+        :param adgroup: on prem ad group name
+        :param clgroup: azure ad cloud group name
         :return:
         """
         if not hasattr(self, 'all_aad_grp_ids'):
@@ -312,43 +312,25 @@ class AzureAd(object):
         if not hasattr(self, 'upn_id_map'):
             self.aad_user_upn_map(onprem=True)
 
-        # self.adgroup_members = self.get_aad_members(groupname=adgroup)
         adgroup_members = powershell.get_adgroupmember(groupname=adgroup)
 
         self.cldgroup_members_full = self.get_aad_members(groupname=clgroup)
-
-        # if len(self.adgroup_members['value']) == 0:
-        #     is_adgroup_null = True
-        # else:
-        #     is_adgroup_null = False
-
-        is_adgroup_null = False if adgroup_members else True
 
         if len(self.cldgroup_members_full['value']) == 0:
             is_cldgroup_null = True
         else:
             is_cldgroup_null = False
 
-        # adgroup_ids = []
-        # self.adgroups_dict = {}
-        # if not is_adgroup_null:
-        #     for id in self.adgroup_members['value']:
-        #         self.adgroups_dict[id['id']] = id['displayName']
-        #         adgroup_ids.append(id['id'])
-
         cldgroup_ids = []
         cldgroup_members = []
-        # self.cldgroups_dict = {}
+
         if not is_cldgroup_null:
             for user in self.cldgroup_members_full['value']:
-                # self.cldgroups_dict[id['id']] = id['displayName']
                 cld_upn_short = user['userPrincipalName'].split('@')[0].lower()
                 cldgroup_ids.append(user['id'])
                 cldgroup_members.append(cld_upn_short.lower())
 
-        # mem_not_in_cld = set(list(self.adgroups_dict.keys())) - set(list(self.cldgroups_dict.keys()))
         mem_not_in_cld = set(adgroup_members) - set(cldgroup_members)
-        # mem_not_in_ad = set(list(self.cldgroups_dict.keys())) - set(list(self.adgroups_dict.keys()))
         mem_not_in_ad = set(cldgroup_members) - set(adgroup_members)
 
         log.info('Members list to be removed from cloud group "{}" - {}'.format(clgroup, list(mem_not_in_ad)))
@@ -365,10 +347,9 @@ class AzureAd(object):
                     mem_to_add_to_cld.append(self.upn_id_map[u])
                 except KeyError:
                     log.error(
-                        'adsynced user id: {} was not found azure ad. User will not be added to group: {}'.format(u,
-                                                                                                                  clgroup))
+                        'adsynced user id: {} was not found azure ad. '
+                        'User will not be added to group: {}'.format(u, clgroup))
 
-            # result = self.add_members_blk(uidlist=list(mem_not_in_cld), gid=self.cldgroup_members_full['group_id'])
             if mem_to_add_to_cld:
                 result = self.add_members_blk(uidlist=mem_to_add_to_cld, gid=self.cldgroup_members_full['group_id'])
                 log.info('Status code: {}'.format(result.status_code))
