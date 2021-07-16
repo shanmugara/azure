@@ -306,6 +306,7 @@ class AzureAd(object):
         :param clgroup: azure ad cloud group name
         :return:
         """
+        log.info('Start syncing AD group "{}" to cloud group "{}"'.format(adgroup, clgroup))
         if not hasattr(self, 'all_aad_grp_ids'):
             self.make_aad_grp_id_map()
 
@@ -321,13 +322,13 @@ class AzureAd(object):
         else:
             is_cldgroup_null = False
 
-        cldgroup_ids = []
+        # cldgroup_ids = []
         cldgroup_members = []
 
         if not is_cldgroup_null:
             for user in self.cldgroup_members_full['value']:
                 cld_upn_short = user['userPrincipalName'].split('@')[0].lower()
-                cldgroup_ids.append(user['id'])
+                # cldgroup_ids.append(user['id'])
                 cldgroup_members.append(cld_upn_short.lower())
 
         mem_not_in_cld = set(adgroup_members) - set(cldgroup_members)
