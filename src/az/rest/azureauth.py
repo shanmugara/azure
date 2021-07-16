@@ -268,7 +268,7 @@ class AzureAd(object):
             return result.json()
         except Exception as e:
             log.error('Exception while getting group from AAD - {}'.format(e))
-            return None
+            return False
 
     @Timer.add_timer
     def make_aad_grp_id_map(self):
@@ -291,7 +291,7 @@ class AzureAd(object):
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token']}
 
         group_obj = self.get_aad_group(groupname=groupname)
-        if group_obj:
+        if all([group_obj, group_obj['value']]):
             gid = group_obj['value'][0]['id']
             query_str = "/groups/{}/members".format(gid)
             _endpoint = config['apiurl'] + query_str
@@ -316,16 +316,9 @@ class AzureAd(object):
 
             return ret_dict
 
-            # try:
-            #     result = self.session.get(_endpoint, headers=raw_headers)
-            #     ret_dict = result.json()
-            #     ret_dict['group_id'] = gid
-            #     ret_dict['group_name'] = groupname
-            #     return ret_dict
-            # except Exception as e:
-            #     log.error('Error while getting group members for "{}" - {}'.format(group_obj, e))
         else:
-            log.error('Did not get a group object for "{}"'.format(groupname))
+            log.error('Did not get a Azure AD group object for "{}"'.format(groupname))
+            return False
 
     @Timer.add_timer
     def aad_user_upn_map(self, onprem=True):
@@ -367,6 +360,10 @@ class AzureAd(object):
             return False
 
         self.cldgroup_members_full = self.get_aad_members(groupname=clgroup)
+
+        if self.cldgroup_members_full == False:
+            log.error('Unable to get Azure AD goup "{}". Check group name. Exiting.'.format(clgroup))
+            return False
 
         if len(self.cldgroup_members_full['value']) == 0:
             is_cldgroup_null = True
