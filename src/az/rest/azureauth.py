@@ -337,17 +337,22 @@ class AzureAd(object):
         # add missing members to cld group
         if mem_not_in_cld:
             mem_to_add_to_cld = []
+            not_in_aad = []
 
             for u in list(mem_not_in_cld):
                 try:
                     mem_to_add_to_cld.append(self.upn_id_map[u])
                 except KeyError:
-                    log.error(
-                        'ad-synced user id: {} was not found in azure ad. '
-                        'This user will not be added to group: {}'.format(u, clgroup))
+                    not_in_aad.append(u)
+            if not_in_aad:
+                log.error(
+                    'on-prem ad users {} not found in azure ad. This may be a transient AAD Sync latency.'
+                    'These users will not be added to group "{}"'.format(not_in_aad, clgroup))
 
             if mem_to_add_to_cld:
-                log.info('Adding new members {} to cloud group "{}"'.format(mem_to_add_to_cld, clgroup))
+                log.info(
+                    'Adding new members {} to cloud group "{}"'.format(list(set(mem_not_in_ad) - set(list(not_in_aad))),
+                                                                       clgroup))
                 result = self.add_members_blk(uidlist=mem_to_add_to_cld, gid=self.cldgroup_members_full['group_id'])
                 log.info('Status code: {}'.format(result.status_code))
         else:
