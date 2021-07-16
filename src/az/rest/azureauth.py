@@ -526,16 +526,6 @@ class AzureAd(object):
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
         _endpoint = config['apiurl'] + '/groups/{}/members/{}/$ref'.format(gid, userid)
 
-        # try:
-        #     grp = self.all_aad_grp_ids[gid]
-        # except:
-        #     grp = gid
-
-        try:
-            log.info('REMOVE member: group:{} uid:{}'.format(grpname, userid))
-        except:
-            pass
-
         try:
             result = self.session.delete(url=_endpoint, headers=raw_headers)
             return result
