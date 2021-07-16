@@ -1,4 +1,9 @@
 from setuptools import setup
+import os
+
+req_lst = ['requests','msal']
+if os.sys.platform == 'win32':
+    req_lst.append('colorama')
 
 setup(name='azuregraph',
       version="0.0.2",
