@@ -414,7 +414,7 @@ class AzureAd(object):
                 else:
                     grp = gid
 
-                log.info('ADD: group:{} uid:{} displayName:{}'.format(grp, uid, self.all_aad_grp_ids[uid]))
+                log.info('ADD: group:{} uid:{} displayName:{}'.format(grp, uid, self.all_aad_grp_ids[gid]))
             except Exception as e:
                 log.info('Exception {} in add_members_blk'.format(e))
 
