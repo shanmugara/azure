@@ -415,8 +415,9 @@ class AzureAd(object):
                     grp = gid
 
                 log.info('ADD: group:{} uid:{} displayName:{}'.format(grp, uid, self.all_aad_grp_ids[uid]))
-            except:
-                pass
+            except Exception as e:
+                log.info('Exception {} in add_members_blk'.format(e))
+
             uid_url = 'https://graph.microsoft.com/v1.0/users/{}'.format(uid)
             data_dict["members@odata.bind"].append(uid_url)
 
