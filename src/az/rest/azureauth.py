@@ -446,7 +446,7 @@ class AzureAd(object):
         ret_result = True
         if len(uidlist) > 20:
             log.info("Number of users {} is larger than 20. We'll add in bathces of 20".format(len(uidlist)))
-            while len(uidlist) <= 20:
+            while len(uidlist) > 0:
                 uidsubset = [uidlist.pop(0) for n in range(20)]
                 log.info('Adding user set {} to group'.format(uidsubset))
                 result = self.add_mem_blk_sub(uidlist=uidsubset, gid=gid)
