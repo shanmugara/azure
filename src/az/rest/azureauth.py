@@ -358,7 +358,7 @@ class AzureAd(object):
         if mem_not_in_ad:
             log.info('Deleting members {} from cloud group "{}"'.format(list(mem_not_in_ad), clgroup))
             for s_upn in list(mem_not_in_ad):
-                log.info('Deleting {}'.format(s_upn))
+                log.info('Deleting "{}" from group "{}"'.format(s_upn, clgroup))
 
                 try:
                     result = self.remove_member(userid=self.upn_id_map[s_upn],
