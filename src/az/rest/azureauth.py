@@ -7,6 +7,8 @@ import urllib3
 import platform
 import base64
 import re
+import functools
+import timeit
 
 from cryptography.x509 import load_pem_x509_certificate
 from cryptography.hazmat.backends import default_backend
@@ -39,6 +41,26 @@ class AzureAd(object):
 
         def __str__(self):
             return self.name
+
+    class Timer(object):
+        """Generic timer"""
+        @staticmethod
+        def add_timer(func):
+            functools.wraps(func)
+
+            def timed_func(*args, **kwargs):  # Inner func return func
+                start_time = timeit.default_timer()
+                func_results = func(*args, **kwargs)
+                end_time = timeit.default_timer()
+                elapsed_time = end_time - start_time
+                log.info(
+                    "Function {} - Elapsed time: {}".format(
+                        func.__name__, round(elapsed_time, 3)
+                    )
+                )
+                return func_results
+
+            return timed_func
 
     def __init__(self, proxy=config["proxy"]):
         # Initialize authentication and get token
@@ -247,6 +269,7 @@ class AzureAd(object):
             log.error('Exception while getting group from AAD - {}'.format(e))
             return None
 
+    @Timer.add_timer
     def make_aad_grp_id_map(self):
         """
         create a dict with id:group
@@ -257,6 +280,7 @@ class AzureAd(object):
         for g in _groups['value']:
             self.all_aad_grp_ids[g['id']] = g['displayName']
 
+    @Timer.add_timer
     def get_aad_members(self, groupname):
         """
         Get members of an AAD groups
@@ -282,6 +306,7 @@ class AzureAd(object):
         else:
             log.error('Did not get a group object for "{}"'.format(groupname))
 
+    @Timer.add_timer
     def aad_user_upn_map(self, onprem=True):
         """
         Create a dict with user upn without @xxx.xxx.xxx and id
@@ -298,6 +323,7 @@ class AzureAd(object):
             log.error('Failed to get users list from AAD')
             return False
 
+    @Timer.add_timer
     def sync_group(self, adgroup, clgroup):
         """
         Get group members from AD synced group and add to cloud group, and remove members not in ad group.
@@ -346,7 +372,7 @@ class AzureAd(object):
                     not_in_aad.append(u)
             if not_in_aad:
                 log.error(
-                    'on-prem ad users {} not found in azure ad. This may be a transient AAD Sync latency.'
+                    'on-prem AD users {} were not found in Azure AD. This may be a transient AAD Sync delay.'
                     'These users will not be added to group "{}"'.format(not_in_aad, clgroup))
 
             if mem_to_add_to_cld:
@@ -401,6 +427,7 @@ class AzureAd(object):
             log.error('Exception {} while adding users to group "{}"'.format(e, gid))
             return False
 
+    @Timer.add_timer
     def add_members_blk(self, uidlist, gid):
         """
         Add multiple users to a group
@@ -436,6 +463,7 @@ class AzureAd(object):
             log.error('Exception while adding users to group "{}"'.format(gid))
             return False
 
+    @Timer.add_timer
     def remove_member(self, userid, gid):
         """
         Remove a user from group
