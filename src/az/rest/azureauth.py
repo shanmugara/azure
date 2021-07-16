@@ -380,7 +380,10 @@ class AzureAd(object):
                     'Adding new members {} to cloud group "{}"'.format(list(set(mem_not_in_cld) - set(list(not_in_aad))),
                                                                        clgroup))
                 result = self.add_members_blk(uidlist=mem_to_add_to_cld, gid=self.cldgroup_members_full['group_id'])
-                log.info('Status code: {}'.format(result.status_code))
+                if result:
+                    log.info('Bulk add result code: OK')
+                else:
+                    log.error('Bulk add result code: FAILED')
         else:
             log.info('No new members to be added to group "{}"'.format(clgroup))
 
@@ -430,26 +433,67 @@ class AzureAd(object):
     @Timer.add_timer
     def add_members_blk(self, uidlist, gid):
         """
-        Add multiple users to a group
+        Add multiple users to a group. If max number of user is larger than 20, use subsets
         :param uidlist:
         :param gid:
+        :return:
+        """
+        # raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
+        # _endpoint = config['apiurl'] + '/groups/{}'.format(gid)
+        #
+        # data_dict = {"members@odata.bind": []}
+
+        ret_result = True
+        if len(uidlist) > 20:
+            log.info("Number of users {} is larger than 20. We'll add in bathces of 20".format(len(uidlist)))
+            while len(uidlist) <= 20:
+                uidsubset = [uidlist.pop(0) for n in range(20)]
+                log.info('Adding user set {} to group'.format(uidsubset))
+                result = self.add_mem_blk_sub(uidlist=uidsubset, gid=gid)
+                log.info('Status code:{}'.format(result.status_code))
+                if result == False: return False
+                if all([ret_result == True, result.status_code != int(204)]):
+                    ret_result = False
+        else:
+            result = self.add_mem_blk_sub(uidlist=uidlist, gid=gid)
+            if result == False: return False
+            if result.status_code != int(204):
+                ret_result = False
+
+        return ret_result
+
+        # for uid in uidlist:
+        #     try:
+        #         uid_url = 'https://graph.microsoft.com/v1.0/users/{}'.format(uid)
+        #         data_dict["members@odata.bind"].append(uid_url)
+        #     except Exception as e:
+        #         log.info('Exception {} in add_members_blk'.format(e))
+        #
+        # data_json = json.dumps(data_dict)
+        #
+        # try:
+        #     result = self.session.patch(url=_endpoint, data=data_json, headers=raw_headers)
+        #     return result
+        #
+        # except Exception as e:
+        #     log.error('Exception while adding users to group "{}"'.format(gid))
+        #     return False
+
+    def add_mem_blk_sub(self, uidlist, gid):
+        """
+        A sub func to add bulk users to a group. This is to handle max 20 member limit in graph api call.
+        :param uidlist:
         :return:
         """
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
         _endpoint = config['apiurl'] + '/groups/{}'.format(gid)
 
         data_dict = {"members@odata.bind": []}
+
         for uid in uidlist:
             try:
                 uid_url = 'https://graph.microsoft.com/v1.0/users/{}'.format(uid)
                 data_dict["members@odata.bind"].append(uid_url)
-
-                # if isinstance(self.all_aad_grp_ids, dict):
-                #     grp = self.all_aad_grp_ids[gid]
-                # else:
-                #     grp = gid
-                #
-                # log.info('ADD: group:{} uid:{} displayName:{}'.format(grp, uid, self.all_aad_grp_ids[gid]))
             except Exception as e:
                 log.info('Exception {} in add_members_blk'.format(e))
 
@@ -462,6 +506,7 @@ class AzureAd(object):
         except Exception as e:
             log.error('Exception while adding users to group "{}"'.format(gid))
             return False
+
 
     @Timer.add_timer
     def remove_member(self, userid, gid):
