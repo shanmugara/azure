@@ -351,7 +351,7 @@ class AzureAd(object):
 
             if mem_to_add_to_cld:
                 log.info(
-                    'Adding new members {} to cloud group "{}"'.format(list(set(mem_not_in_ad) - set(list(not_in_aad))),
+                    'Adding new members {} to cloud group "{}"'.format(list(set(mem_not_in_cld) - set(list(not_in_aad))),
                                                                        clgroup))
                 result = self.add_members_blk(uidlist=mem_to_add_to_cld, gid=self.cldgroup_members_full['group_id'])
                 log.info('Status code: {}'.format(result.status_code))
