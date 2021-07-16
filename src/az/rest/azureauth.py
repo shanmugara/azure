@@ -347,8 +347,9 @@ class AzureAd(object):
     @Timer.add_timer
     def sync_group(self, adgroup, clgroup):
         """
-        Get group members from AD synced group and add to cloud group, and remove members not in ad group.
-        ad group is retrieved from on-prem ad. required quest powershell module for ad.
+        Get group members from on-prem AD group and add to a AAD cloud group, and remove members not in on-prem AD group
+        from cloud group. AD group is retrieved from on-prem ad. requires quest powershell module for ad. On-prem AD group
+        does not need to be synced to azure ad using AAD sync.
         :param adgroup: on prem ad group name
         :param clgroup: azure ad cloud group name
         :return:
@@ -417,8 +418,8 @@ class AzureAd(object):
 
                 try:
                     result = self.remove_member(userid=self.upn_id_map[s_upn],
-                                                gid=self.cldgroup_members_full['group_id'],
-                                                grpname=clgroup)
+                                                gid=self.cldgroup_members_full['group_id'])
+
                     log.info('Status code: {}'.format(result.status_code))
                 except KeyError:
                     log.error('Unable to find adsynced user {} in azure ad'.format(s_upn))
@@ -464,7 +465,7 @@ class AzureAd(object):
 
         ret_result = True
         if len(uidlist) > 20:
-            log.info("Number of users {} is larger than 20. We'll add in bathces of 20".format(len(uidlist)))
+            log.info("Total number of users {} is greater than 20. We'll add in sets of 20".format(len(uidlist)))
             while len(uidlist) > 0:
                 count = 20 if len(uidlist) > 20 else len(uidlist)
                 uidsubset = [uidlist.pop(0) for n in range(count)]
@@ -516,11 +517,11 @@ class AzureAd(object):
             return False
 
     @Timer.add_timer
-    def remove_member(self, userid, gid, grpname=''):
+    def remove_member(self, userid, gid):
         """
         Remove a user from group
-        :param userid:
-        :param gid:
+        :param userid: azure ad user object id
+        :param gid: azure ad group object id
         :return:
         """
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
@@ -553,6 +554,7 @@ class AzureAd(object):
     def get_licences_all(self, guid=None):
         """
         Get a full licence count
+        :param guid: optional guid of a sku to return only one sku
         :return:
         """
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
@@ -580,7 +582,8 @@ class AzureAd(object):
     def lic_mon(self, skuname, threshold=5):
         """
         Monitor and report licence thresholds
-        :param threshold:
+        :param skuname: license pack skuname
+        :param threshold: free licence count threshold
         :return:
         """
         if not hasattr(self, 'lic_map'):
@@ -605,7 +608,7 @@ class AzureAd(object):
     def get_user_license(self, uid):
         """
         Get license details for teh given user
-        :param uid:
+        :param uid: azure ad user object id
         :return:
         """
 

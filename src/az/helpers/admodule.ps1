@@ -14,7 +14,7 @@ function get-groupmembers {
             return $samname
         }
     catch {
-            Write-Error "Error while getting group $groupname"
+            Write-Host "Error while getting group $groupname"
             return $false
         }
 }
