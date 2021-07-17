@@ -9,6 +9,7 @@ import base64
 import re
 import functools
 import timeit
+from datetime import datetime
 
 from cryptography.x509 import load_pem_x509_certificate
 from cryptography.hazmat.backends import default_backend
@@ -394,8 +395,8 @@ class AzureAd(object):
                     not_in_aad.append(u)
             if not_in_aad:
                 log.error(
-                    'on-prem AD users {} were not found in Azure AD. This may be a transient AAD Sync delay.'
-                    'These users will not be added to group "{}"'.format(not_in_aad, clgroup))
+                    'on-prem AD users {} not found in Azure AD. This may be a transient AAD Sync delay.'
+                    'These users will not be added to group "{}" in this cycle.'.format(not_in_aad, clgroup))
 
             if mem_to_add_to_cld:
                 log.info(
@@ -487,7 +488,6 @@ class AzureAd(object):
 
         return ret_result
 
-
     def add_mem_blk_sub(self, uidlist, gid):
         """
         A sub func to add bulk users to a group. This is to handle max 20 member limit in graph api call.
@@ -554,7 +554,6 @@ class AzureAd(object):
     def get_licences_all(self, guid=None):
         """
         Get a full licence count
-        :param guid: optional guid of a sku to return only one sku
         :return:
         """
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
@@ -579,11 +578,10 @@ class AzureAd(object):
         for l in lics['value']:
             self.lic_map[l['skuPartNumber'].lower()] = l['id']
 
-    def lic_mon(self, skuname, threshold=5):
+    def lic_mon(self, skuname, percentage=25, threshold=5):
         """
         Monitor and report licence thresholds
-        :param skuname: license pack skuname
-        :param threshold: free licence count threshold
+        :param threshold:
         :return:
         """
         if not hasattr(self, 'lic_map'):
@@ -594,21 +592,41 @@ class AzureAd(object):
             log.error('Invalid SKU name, or SKU {} doesnt exist in organization'.format(skuname.upper()))
             return False
 
-        if not lics:
+        if lics == False:
             liclog.error('Failed to get licence data')
             return
 
         free_lics = int(lics['prepaidUnits']['enabled']) - int(lics['consumedUnits'])
-        if (free_lics) < threshold:
-            liclog.error("{} remaining licence count is {}. "
-                         "Failed free licence threshold of {}.".format(skuname.upper(), free_lics, threshold))
-        else:
-            liclog.info("{} remaining licence count is {}. Licence status OK".format(skuname.upper(), free_lics))
+        used_percentage = (int(lics['consumedUnits']) / int(lics['prepaidUnits']['enabled'])) * 100
+        free_percentage = round(100 - used_percentage)
+
+        if threshold:
+            if (free_lics) < threshold:
+                liclog.error("{} Total: {} remaining licence count is {}."
+                             "Failed free licence threshold of {}.".format(skuname.upper(),
+                                                                           int(lics['prepaidUnits']['enabled']),
+                                                                           free_lics,
+                                                                           threshold))
+            else:
+                liclog.info(
+                    "{} Total: {}. Remaining licence count is {}. Licence status OK".format(skuname.upper(), int(
+                        lics['prepaidUnits']['enabled']), free_lics))
+        if percentage:
+            if (free_percentage) < int(percentage):
+                liclog.error("{} Total: {}. Free percentage is {}%"
+                             " Failed free licence threshold of {}%.".format(skuname.upper(),
+                                                                             int(lics['prepaidUnits']['enabled']),
+                                                                             free_percentage, percentage))
+            else:
+                liclog.info(
+                    "{} Total: {}. Free percentage {}%. Licence status OK".format(skuname.upper(),
+                                                                                  int(lics['prepaidUnits']['enabled']),
+                                                                                  free_percentage))
 
     def get_user_license(self, uid):
         """
         Get license details for teh given user
-        :param uid: azure ad user object id
+        :param uid:
         :return:
         """
 
@@ -622,9 +640,10 @@ class AzureAd(object):
             log.error('Exception while making REST call - {}'.format(e))
             return False
 
-    def report_license_activation(self):
+    def report_license_activation(self, outdir):
         """
         Generate Activation report dict
+        outpath: p = "\\\\corp.bloomberg.com\\ny-dfs\\Ops\\InfoSys\\Systems Engineering\\Dropboxes\\O365Activations"
         :return:
         """
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
@@ -632,15 +651,16 @@ class AzureAd(object):
 
         try:
             result = self.session.get(url=_endpoint, headers=raw_headers)
+            log.info('Response reason:{} code:{}'.format(result.reason, result.status_code))
             raw_l = result.text.splitlines()
             raw_l.pop(0)
             raw_dict = {}
             re_pat = re.compile('".+"')
+
             for i in raw_l:
-                print(i)
                 if re.search(re_pat, i):
                     line = re.sub(re_pat, '', i)
-                    date, upn, disp, p_type, last_act, win, mac, win10m, ios, android, shared = i.split(',')
+                    date, upn, disp, p_type, last_act, win, mac, win10m, ios, android, shared = line.split(',')
                     disp = re.search(re_pat, i).group()
                 else:
                     date, upn, disp, p_type, last_act, win, mac, win10m, ios, android, shared = i.split(',')
@@ -657,7 +677,139 @@ class AzureAd(object):
                 raw_dict[u_o]['android'] = android
                 raw_dict[u_o]['sharedcomp'] = shared
 
-            return raw_dict, result
+            # write csv file
+            file_out_lines = []
+            header = 'Date,User Principal Name,Display Name,Product Type,Last Activated Date,Windows,Mac,' \
+                     'Windows 10 Mobile,iOS,Android,Activated On Shared Computer'
+            file_out_lines.append('{}\n'.format(header))
+
+            for l in raw_l:
+                file_out_lines.append('{}\n'.format(l))
+
+            epoch_now = str(int((datetime.now()).timestamp()))
+            fname_csv = 'licact_report_{}.csv'.format(epoch_now)
+            # fname_json = 'licact_report_{}.json'.format(epoch_now)
+
+            if os.path.isdir(outdir):
+                outfile_csv = os.path.join(outdir, fname_csv)
+                with open(outfile_csv, 'w') as f:
+                    f.writelines(file_out_lines)
+
+                # outfile_json = os.path.join(outdir, fname_json)
+                # with open(outfile_json, 'w') as j:
+                #     json.dump(raw_dict, j)
+            return raw_dict
+
         except Exception as e:
             log.error('Exception while making REST call - {}'.format(e))
             return False
+    # def get_licences_all(self, guid=None):
+    #     """
+    #     Get a full licence count
+    #     :param guid: optional guid of a sku to return only one sku
+    #     :return:
+    #     """
+    #     raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
+    #     _endpoint = config["apiurl"] + "/subscribedSkus"
+    #     if guid:
+    #         _endpoint += '/{}'.format(guid)
+    #
+    #     try:
+    #         result = self.session.get(url=_endpoint, headers=raw_headers)
+    #         return result.json()
+    #     except Exception as e:
+    #         log.error('Exception while making REST call - {}'.format(e))
+    #         return False
+    #
+    # def licence_map(self):
+    #     """
+    #     Create a licence refernce map with string:guid
+    #     :return:
+    #     """
+    #     lics = self.get_licences_all()
+    #     self.lic_map = {}
+    #     for l in lics['value']:
+    #         self.lic_map[l['skuPartNumber'].lower()] = l['id']
+    #
+    # def lic_mon(self, skuname, threshold=5):
+    #     """
+    #     Monitor and report licence thresholds
+    #     :param skuname: license pack skuname
+    #     :param threshold: free licence count threshold
+    #     :return:
+    #     """
+    #     if not hasattr(self, 'lic_map'):
+    #         self.licence_map()
+    #     if skuname.lower() in self.lic_map.keys():
+    #         lics = self.get_licences_all(guid=self.lic_map[skuname.lower()])
+    #     else:
+    #         log.error('Invalid SKU name, or SKU {} doesnt exist in organization'.format(skuname.upper()))
+    #         return False
+    #
+    #     if not lics:
+    #         liclog.error('Failed to get licence data')
+    #         return
+    #
+    #     free_lics = int(lics['prepaidUnits']['enabled']) - int(lics['consumedUnits'])
+    #     if (free_lics) < threshold:
+    #         liclog.error("{} remaining licence count is {}. "
+    #                      "Failed free licence threshold of {}.".format(skuname.upper(), free_lics, threshold))
+    #     else:
+    #         liclog.info("{} remaining licence count is {}. Licence status OK".format(skuname.upper(), free_lics))
+    #
+    # def get_user_license(self, uid):
+    #     """
+    #     Get license details for teh given user
+    #     :param uid: azure ad user object id
+    #     :return:
+    #     """
+    #
+    #     raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
+    #     _endpoint = config["apiurl"] + "/users/{}/licenseDetails".format(uid)
+    #
+    #     try:
+    #         result = self.session.get(url=_endpoint, headers=raw_headers)
+    #         return result.json()
+    #     except Exception as e:
+    #         log.error('Exception while making REST call - {}'.format(e))
+    #         return False
+    #
+    # def report_license_activation(self):
+    #     """
+    #     Generate Activation report dict
+    #     :return:
+    #     """
+    #     raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
+    #     _endpoint = config["apiurl"] + "/reports/getOffice365ActivationsUserDetail"
+    #
+    #     try:
+    #         result = self.session.get(url=_endpoint, headers=raw_headers)
+    #         raw_l = result.text.splitlines()
+    #         raw_l.pop(0)
+    #         raw_dict = {}
+    #         re_pat = re.compile('".+"')
+    #         for i in raw_l:
+    #             print(i)
+    #             if re.search(re_pat, i):
+    #                 line = re.sub(re_pat, '', i)
+    #                 date, upn, disp, p_type, last_act, win, mac, win10m, ios, android, shared = i.split(',')
+    #                 disp = re.search(re_pat, i).group()
+    #             else:
+    #                 date, upn, disp, p_type, last_act, win, mac, win10m, ios, android, shared = i.split(',')
+    #
+    #             u_o = self.DupObj(upn)
+    #             raw_dict[u_o] = {}
+    #             raw_dict[u_o]['display_name'] = disp
+    #             raw_dict[u_o]['product_type'] = p_type
+    #             raw_dict[u_o]['last_activated'] = last_act
+    #             raw_dict[u_o]['windows'] = win
+    #             raw_dict[u_o]['macos'] = mac
+    #             raw_dict[u_o]['win10mobile'] = win10m
+    #             raw_dict[u_o]['ios'] = ios
+    #             raw_dict[u_o]['android'] = android
+    #             raw_dict[u_o]['sharedcomp'] = shared
+    #
+    #         return raw_dict, result
+    #     except Exception as e:
+    #         log.error('Exception while making REST call - {}'.format(e))
+    #         return False
