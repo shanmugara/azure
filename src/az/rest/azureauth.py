@@ -339,7 +339,7 @@ class AzureAd(object):
             return False
 
     @Timer.add_timer
-    def sync_group(self, adgroup, clgroup):
+    def sync_group(self, adgroup, clgroup, test=True):
         """
         Get group members from on-prem AD group and add to a AAD cloud group, and remove members not in on-prem AD group
         from cloud group. AD group is retrieved from on-prem ad. requires quest powershell module for ad. On-prem AD group
@@ -403,7 +403,8 @@ class AzureAd(object):
                     'Adding new members {} to cloud group "{}"'.format(
                         list(set(mem_not_in_cld) - set(list(not_in_aad))),
                         clgroup))
-                result = self.add_members_blk(uidlist=mem_to_add_to_cld, gid=self.cldgroup_members_full['group_id'])
+                result = self.add_members_blk(uidlist=mem_to_add_to_cld, gid=self.cldgroup_members_full['group_id'],
+                                              test=test)
                 if result:
                     log.info('Bulk add result code: OK')
                 else:
@@ -456,7 +457,7 @@ class AzureAd(object):
             return False
 
     @Timer.add_timer
-    def add_members_blk(self, uidlist, gid):
+    def add_members_blk(self, uidlist, gid, test=True):
         """
         Add multiple users to a group. If max number of user is larger than 20, use subsets
         :param uidlist:
@@ -472,13 +473,22 @@ class AzureAd(object):
                 uidsubset = [uidlist.pop(0) for n in range(count)]
 
                 log.info('Adding user set {} to group'.format(uidsubset))
-                result = self.add_mem_blk_sub(uidlist=uidsubset, gid=gid)
+                result = self.add_mem_blk_sub(uidlist=uidsubset, gid=gid, test=test)
+
+                if test:
+                    log.info('Test mode...')
+                    continue
+
                 log.info('Status code:{}'.format(result.status_code))
                 if result == False: return False
                 if all([ret_result == True, result.status_code != int(204)]):
                     ret_result = False
         else:
             result = self.add_mem_blk_sub(uidlist=uidlist, gid=gid)
+            if test:
+                log.info('Test mode...')
+                return ret_result
+
             log.info('Status code:{}'.format(result.status_code))
             if result == False: return False
 
@@ -488,7 +498,7 @@ class AzureAd(object):
 
         return ret_result
 
-    def add_mem_blk_sub(self, uidlist, gid):
+    def add_mem_blk_sub(self, uidlist, gid, test=True):
         """
         A sub func to add bulk users to a group. This is to handle max 20 member limit in graph api call.
         :param uidlist:
@@ -504,17 +514,20 @@ class AzureAd(object):
                 uid_url = 'https://graph.microsoft.com/v1.0/users/{}'.format(uid)
                 data_dict["members@odata.bind"].append(uid_url)
             except Exception as e:
-                log.info('Exception {} in add_members_blk'.format(e))
+                log.error('Exception {} in add_members_blk'.format(e))
 
         data_json = json.dumps(data_dict)
 
-        try:
-            result = self.session.patch(url=_endpoint, data=data_json, headers=raw_headers)
-            return result
+        if test == False:
+            try:
+                result = self.session.patch(url=_endpoint, data=data_json, headers=raw_headers)
+                return result
 
-        except Exception as e:
-            log.error('Exception while adding users to group "{}"'.format(gid))
-            return False
+            except Exception as e:
+                log.error('Exception while adding users to group "{}"'.format(gid))
+                return False
+        else:
+            log.info('Running in test mode, no writes performed.')
 
     @Timer.add_timer
     def remove_member(self, userid, gid):
