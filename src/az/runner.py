@@ -49,6 +49,7 @@ def main():
     elif args.command == 'monitor':
         aad.lic_mon(skuname=args.skuname, threshold=args.threshold, percentage=args.percent)
     elif args.command == 'groupsync':
+        print('--testmode: {}'.format(args.testmode))
         aad.sync_group(adgroup=args.adgroup, clgroup=args.cloudgroup, test=args.testmode)
     elif args.command == 'report':
         aad.report_license_activation(outdir=args.dirpath)
