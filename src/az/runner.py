@@ -34,6 +34,8 @@ def main():
     group_sync = subparser.add_parser('groupsync', help='Sync AD group to cloud group')
     group_sync.add_argument('-a', '--adgroup', help='AD group name', required=True, type=str)
     group_sync.add_argument('-c', '--cloudgroup', help='Cloud group name', required=True, type=str)
+    group_sync.add_argument('-t', '--testmode', help='Run in test mode, no writes', required=True, type=bool,
+                            default=True)
 
     args = parser.parse_args()
 
@@ -47,7 +49,7 @@ def main():
     elif args.command == 'monitor':
         aad.lic_mon(skuname=args.skuname, threshold=args.threshold, percentage=args.percent)
     elif args.command == 'groupsync':
-        aad.sync_group(adgroup=args.adgroup, clgroup=args.cloudgroup)
+        aad.sync_group(adgroup=args.adgroup, clgroup=args.cloudgroup, test=args.testmode)
     elif args.command == 'report':
         aad.report_license_activation(outdir=args.dirpath)
 
