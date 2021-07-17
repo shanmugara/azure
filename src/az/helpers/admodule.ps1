@@ -6,7 +6,7 @@ asnp quest*
 function get-groupmembers {
     param($groupname)
     try {
-            $groupmems = get-qadgroupmember $groupname -indirect -type user
+            $groupmems = get-qadgroupmember $groupname -indirect -type user -sizelimit 50000
             $samname = @()
             $groupmems|%{
                 $samname += $_.samaccountname

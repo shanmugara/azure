@@ -338,6 +338,34 @@ class AzureAd(object):
             log.error('Failed to get users list from AAD')
             return False
 
+    def sync_group_json(self, filename):
+        """
+        Use a json file as input for calling sync_group. file format is adgroup:cldgroup
+        sample input json file format"
+        --start--
+        {
+            "myadgroup1": "mycloudgroup1",
+            "myadgroup2": "mycloudgroup2"
+        }
+        --end--
+        :param filename:
+        :return:
+        """
+        if os.path.isfile(filename):
+            try:
+                with open(filename) as f:
+                    log.info('loading file {}'.format(filename))
+                    syn_group_dict = json.load(filename)
+                    log.info('processing groups from file..')
+                    for g in syn_group_dict:
+                        self.sync_group(adgroup=g, clgroup=syn_group_dict[g], test=False)
+
+            except Exception as e:
+                log.error('Exception while loading file. Exception: {}'.format(e))
+
+        else:
+            log.error('Invalid file path.. "{}"'.format(filename))
+
     @Timer.add_timer
     def sync_group(self, adgroup, clgroup, test=False):
         """
@@ -441,8 +469,8 @@ class AzureAd(object):
     def add_member(self, userid, gid):
         """
         Add a single user to a group
-        :param userid:
-        :param gid:
+        :param userid: azure ad user guid
+        :param gid: azure ad group guid
         :return:
         """
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json",
