@@ -694,6 +694,8 @@ class AzureAd(object):
                 outfile_csv = os.path.join(outdir, fname_csv)
                 with open(outfile_csv, 'w') as f:
                     f.writelines(file_out_lines)
+            else:
+                log.error('Destination path "{}" doesnt exist or unreachable'.format(outdir))
 
                 # outfile_json = os.path.join(outdir, fname_json)
                 # with open(outfile_json, 'w') as j:
