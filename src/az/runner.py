@@ -32,12 +32,11 @@ def main():
     parser_mon.add_argument('-s', '--skuname', help='SKU Part name of the product', required=True, choices=sku_list)
 
     group_sync = subparser.add_parser('groupsync', help='Sync AD group to cloud group')
-    group = group_sync.add_mutually_exclusive_group()
-    group.add_argument('-a', '--adgroup', help='AD group name', required=False, type=str)
-    group.add_argument('-c', '--cloudgroup', help='Cloud group name', required=False, type=str)
-    group.add_argument('-t', '--testmode', dest='testmode',help='Run in test mode, no writes', action='store_true')
-    group.set_defaults(testmode=False)
+    group_sync.add_argument('-c', '--cloudgroup', help='Cloud group name', required=False, type=str)
+    group_sync.add_argument('-t', '--testmode', dest='testmode',help='Run in test mode, no writes', action='store_true')
+    group_sync.set_defaults(testmode=False)
     filename = group_sync.add_mutually_exclusive_group()
+    filename.add_argument('-a', '--adgroup', help='AD group name', required=False, type=str)
     filename.add_argument('-f', '--filename', help='Input JSON file path to parse group names from', type=str)
 
     args = parser.parse_args()
