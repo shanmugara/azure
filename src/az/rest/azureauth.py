@@ -355,7 +355,7 @@ class AzureAd(object):
             try:
                 with open(filename) as f:
                     log.info('loading file {}'.format(filename))
-                    syn_group_dict = json.load(filename)
+                    syn_group_dict = json.load(f)
                     log.info('processing groups from file..')
                     for g in syn_group_dict:
                         self.sync_group(adgroup=g, clgroup=syn_group_dict[g], test=False)
