@@ -339,13 +339,14 @@ class AzureAd(object):
             return False
 
     @Timer.add_timer
-    def sync_group(self, adgroup, clgroup, test):
+    def sync_group(self, adgroup, clgroup, test=False):
         """
         Get group members from on-prem AD group and add to a AAD cloud group, and remove members not in on-prem AD group
         from cloud group. AD group is retrieved from on-prem ad. requires quest powershell module for ad. On-prem AD group
         does not need to be synced to azure ad using AAD sync.
         :param adgroup: on prem ad group name
         :param clgroup: azure ad cloud group name
+        :param test: test mode with no writes (bool)
         :return:
         """
         print('Test mode: {}'.format(test))
@@ -421,9 +422,13 @@ class AzureAd(object):
 
                 try:
                     result = self.remove_member(userid=self.upn_id_map[s_upn],
-                                                gid=self.cldgroup_members_full['group_id'])
+                                                gid=self.cldgroup_members_full['group_id'], test=test)
+                    if test:
+                        log.info('Test mode...')
+                        continue
 
                     log.info('Status code: {}'.format(result.status_code))
+
                 except KeyError:
                     log.error('Unable to find adsynced user {} in azure ad'.format(s_upn))
                 except Exception as e:
@@ -532,7 +537,7 @@ class AzureAd(object):
             return None
 
     @Timer.add_timer
-    def remove_member(self, userid, gid):
+    def remove_member(self, userid, gid, test):
         """
         Remove a user from group
         :param userid: azure ad user object id
@@ -542,12 +547,16 @@ class AzureAd(object):
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
         _endpoint = config['apiurl'] + '/groups/{}/members/{}/$ref'.format(gid, userid)
 
-        try:
-            result = self.session.delete(url=_endpoint, headers=raw_headers)
-            return result
-        except Exception as e:
-            log.error('Exception while deleteing user {} from group {}'.format(userid, gid))
-            return False
+        if not test:
+            try:
+                result = self.session.delete(url=_endpoint, headers=raw_headers)
+                return result
+            except Exception as e:
+                log.error('Exception while deleteing user {} from group {}'.format(userid, gid))
+                return False
+        else:
+            log.info('Running in test mode, no writes performed')
+            return None
 
     def get_open_extensions(self, oid):
         """
