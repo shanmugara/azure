@@ -356,9 +356,10 @@ class AzureAd(object):
                 with open(filename) as f:
                     log.info('loading file {}'.format(filename))
                     syn_group_dict = json.load(f)
-                    log.info('processing groups from file..')
+                    log.info('processing groups from sync file..')
                     for g in syn_group_dict:
                         self.sync_group(adgroup=g, clgroup=syn_group_dict[g], test=False)
+                    log.info('finished processing sync file..')
 
             except Exception as e:
                 log.error('Exception while loading file. Exception: {}'.format(e))
