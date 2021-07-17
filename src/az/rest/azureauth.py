@@ -348,6 +348,7 @@ class AzureAd(object):
         :param clgroup: azure ad cloud group name
         :return:
         """
+        print('Test mode: {}'.format(test))
         log.info('Start syncing AD group "{}" to cloud group "{}"'.format(adgroup, clgroup))
         if not hasattr(self, 'all_aad_grp_ids'):
             self.make_aad_grp_id_map()
