@@ -339,7 +339,7 @@ class AzureAd(object):
             return False
 
     @Timer.add_timer
-    def sync_group(self, adgroup, clgroup, test=True):
+    def sync_group(self, adgroup, clgroup, test):
         """
         Get group members from on-prem AD group and add to a AAD cloud group, and remove members not in on-prem AD group
         from cloud group. AD group is retrieved from on-prem ad. requires quest powershell module for ad. On-prem AD group
@@ -457,7 +457,7 @@ class AzureAd(object):
             return False
 
     @Timer.add_timer
-    def add_members_blk(self, uidlist, gid, test=True):
+    def add_members_blk(self, uidlist, gid, test):
         """
         Add multiple users to a group. If max number of user is larger than 20, use subsets
         :param uidlist:
@@ -484,7 +484,7 @@ class AzureAd(object):
                 if all([ret_result == True, result.status_code != int(204)]):
                     ret_result = False
         else:
-            result = self.add_mem_blk_sub(uidlist=uidlist, gid=gid)
+            result = self.add_mem_blk_sub(uidlist=uidlist, gid=gid, test=test)
             if test:
                 log.info('Test mode...')
                 return ret_result
@@ -498,7 +498,7 @@ class AzureAd(object):
 
         return ret_result
 
-    def add_mem_blk_sub(self, uidlist, gid, test=True):
+    def add_mem_blk_sub(self, uidlist, gid, test):
         """
         A sub func to add bulk users to a group. This is to handle max 20 member limit in graph api call.
         :param uidlist:
@@ -518,7 +518,7 @@ class AzureAd(object):
 
         data_json = json.dumps(data_dict)
 
-        if test == False:
+        if not test:
             try:
                 result = self.session.patch(url=_endpoint, data=data_json, headers=raw_headers)
                 return result
@@ -528,6 +528,7 @@ class AzureAd(object):
                 return False
         else:
             log.info('Running in test mode, no writes performed.')
+            return None
 
     @Timer.add_timer
     def remove_member(self, userid, gid):
