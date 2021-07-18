@@ -21,13 +21,13 @@ def pfx_to_pem(pfx_path, pfx_password):
     cert_file_out = "mycertfile.pem"
     cert_key_out = "mycertkey.pem"
 
-    with open(cert_file_out, 'wb') as pem_file:
+    with open(cert_key_out, 'wb') as pem_file:
         print('step 3')
         pem_file.write(private_key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption()))
         for ca in add_certs:
             pem_file.write(ca.public_bytes(Encoding.PEM))
 
-    with open(cert_key_out, 'wb') as pem_file:
+    with open(cert_file_out, 'wb') as pem_file:
         pem_file.write(main_cert.public_bytes(Encoding.PEM))
 
 
