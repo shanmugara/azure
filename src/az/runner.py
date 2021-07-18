@@ -19,8 +19,6 @@ def main():
     parser = argparse.ArgumentParser(description="Azure Graph API runner")
 
     subparser = parser.add_subparsers(dest='command')
-    parse_lic = subparser.add_parser('licence', help='Check licence data')
-    parse_lic.add_argument('-g', '--guid', help='SKU guid', required=True, default=None)
 
     parse_rep = subparser.add_parser('report', help='Activation report')
     parse_rep.add_argument('-d', '--dirpath', help='Directory path for output file',
@@ -46,9 +44,8 @@ def main():
     else:
         return False
 
-    if args.command == 'licence':
-        aad.get_licences_all(guid=args.guid)
-    elif args.command == 'monitor':
+
+    if args.command == 'monitor':
         aad.lic_mon(skuname=args.skuname, threshold=args.threshold, percentage=args.percent)
     elif args.command == 'groupsync':
         if all([args.adgroup, args.cloudgroup]):
