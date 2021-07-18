@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat
 from cryptography.hazmat.primitives.serialization.pkcs12 import load_key_and_certificates
 
 
-@contextmanager
+# @contextmanager
 def pfx_to_pem(pfx_path, pfx_password):
     '''
     Decrypts the .pfx file to cert and key file
