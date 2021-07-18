@@ -23,15 +23,20 @@ def main():
     parse_rep = subparser.add_parser('report', help='Activation report')
     parse_rep.add_argument('-d', '--dirpath', help='Directory path for output file',
                            default="\\\\corp.bloomberg.com\\ny-dfs\\Ops\\InfoSys\\Systems Engineering\\Dropboxes\\O365Activations")
+    parse_rep.add_argument('--userauth', help='Use username password auth instead of cert auth.', action='store_true')
 
     parser_mon = subparser.add_parser('monitor', help='Monitor free licence')
     parser_mon.add_argument('-t', '--threshold', help='Check threshold', required=False, type=int, default=4)
     parser_mon.add_argument('-p', '--percent', help='Check threshold percentage', required=False, default=None)
     parser_mon.add_argument('-s', '--skuname', help='SKU Part name of the product', required=True, choices=sku_list)
+    parser_mon.add_argument('--userauth', help='Use username password auth instead of cert auth.', action='store_true')
+
 
     group_sync = subparser.add_parser('groupsync', help='Sync AD group to cloud group')
+    group_sync.add_argument('--userauth', help='Use username password auth instead of cert auth.', action='store_true')
     group_sync.add_argument('-c', '--cloudgroup', help='Cloud group name', required=False, type=str)
-    group_sync.add_argument('-t', '--testmode', dest='testmode',help='Run in test mode, no writes', action='store_true')
+    group_sync.add_argument('-t', '--testmode', dest='testmode', help='Run in test mode, no writes',
+                            action='store_true')
     group_sync.set_defaults(testmode=False)
     filename = group_sync.add_mutually_exclusive_group()
     filename.add_argument('-a', '--adgroup', help='AD group name', required=False, type=str)
@@ -40,10 +45,10 @@ def main():
     args = parser.parse_args()
 
     if args:
-        aad = azureauth.AzureAd()
+        cert_auth = True if not args.userauth else False
+        aad = azureauth.AzureAd(cert_auth=cert_auth)
     else:
         return False
-
 
     if args.command == 'monitor':
         aad.lic_mon(skuname=args.skuname, threshold=args.threshold, percentage=args.percent)

@@ -18,7 +18,7 @@ from cryptography.hazmat.primitives import hashes
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from az.helpers import my_logger
-from az.helpers.config import config, app_secret, cert_key_path, cert_path
+from az.helpers.config import config, cert, user
 from az.helpers import powershell
 
 if platform.system().lower() == 'windows':
@@ -44,7 +44,10 @@ class AzureAd(object):
             return self.name
 
     class Timer(object):
-        """Generic timer"""
+        """
+        Generic timer
+        :return: wrapped func
+        """
 
         @staticmethod
         def add_timer(func):
@@ -64,74 +67,96 @@ class AzureAd(object):
 
             return timed_func
 
-    def __init__(self, proxy=config["proxy"]):
+    def __init__(self, proxy=config["proxy"], cert_auth=config["cert_auth"]):
         # Initialize authentication and get token
-
-        client_id = config["client_id"]
-        client_secret = config["client_secret"]
-        scope = config["scope"]
-        authority = config["authority"]
-
-        if config["cert_auth"]:
-            client_credentials = self.get_cert_creds()
-        else:
-            username = config["username"]
-            pwd = base64.b64decode(config['password'].decode("utf-8")).decode()
-            client_credentials = client_secret
-
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         self.session = requests.Session()
+
         if proxy is not None:
             self.session.proxies = proxy
+
         retries = Retry(total=5, backoff_factor=1, status_forcelist=[502, 503, 504])
         self.session.mount("http://", HTTPAdapter(max_retries=retries))
         self.session.mount("https://", HTTPAdapter(max_retries=retries))
 
+        self.cert_auth = cert_auth
+
+        if self.cert_auth:
+            self.client_credentials = self.get_cert_creds()
+            self.init_app_confidential()
+        else:
+            self.client_credentials = user["client_secret"]
+            self.init_app()
+
+        self.init_token()
+
+    def init_app(self):
+        """
+        Init msal auth
+        :return:
+        """
         self.app = msal.ClientApplication(
-            client_id,
-            authority=authority,
-            client_credential=client_credentials,
+            config["client_id"],
+            authority=config["authority"],
+            client_credential=self.client_credentials,
             proxies=config['proxy']
         )
 
+    def init_app_confidential(self):
+        """
+        Init msal confidential auth
+        :return:
+        """
+        self.app = msal.ConfidentialClientApplication(
+            client_id=config["client_id"],
+            authority=config["authority"],
+            client_credential=self.client_credentials,
+            proxies=config['proxy']
+        )
+
+    def init_token(self):
+        """
+        Get an auth token
+        :return:
+        """
         self.auth = None
         # Firstly, check the cache to see if this end user has signed in before
-        accounts = self.app.get_accounts(username=username)
-        if accounts:
-            log.info("Account(s) exists in cache, probably with token too. Let's try.")
-            self.auth = self.app.acquire_token_silent(scope, account=accounts[0])
+        if self.cert_auth:
+            log.info('Obtaining new auth token by certificate and key pair')
+            self.auth = self.app.acquire_token_for_client(scopes=cert['scope'])
+        else:
+            accounts = self.app.get_accounts(username=user["username"])
+            if accounts:
+                log.info("Account(s) exists in cache, probably with token too. Let's try.")
+                self.auth = self.app.acquire_token_silent(config["scope"], account=accounts[0])
 
-        if not self.auth:
-            log.info("No suitable token exists in cache. Let's get a new one from AAD.")
-            # See this page for constraints of Username Password Flow.
-            # https://github.com/AzureAD/microsoft-authentication-library-for-python/wiki/Username-Password-Authentication
-
-            self.auth = self.app.acquire_token_by_username_password(username, pwd, scopes=scope)
+            if not self.auth:
+                log.info("Obtaining new auth token by username and password.")
+                # See this page for constraints of Username Password Flow.
+                # https://github.com/AzureAD/microsoft-authentication-library-for-python/wiki/Username-Password-Authentication
+                pwd = base64.b64decode(user['password'].decode("utf-8")).decode()
+                self.auth = self.app.acquire_token_by_username_password(user["username"], pwd, scopes=user["scope"])
 
         if "access_token" in self.auth:
-            # Test Calling graph using the access token
-            _endpoint = config["apiurl"] + "/users"
-            graph_data = self.session.get(  # Use token to call downstream service
-                _endpoint,
-                headers={'Authorization': 'Bearer ' + self.auth['access_token']}, ).json()
-            # print("Graph API call self.auth: %s" % json.dumps(graph_data, indent=2))
+            log.info('Successfully obtained auth token.')
+
         else:
             log.error(self.auth.get("error"))
             log.error(self.auth.get("error_description"))
-            log.error(self.auth.get("correlation_id"))  # You may need this when reporting a bug
-            if 65001 in self.auth.get("error_codes", []):  # Not mean to be coded programatically, but...
+            log.error(self.auth.get("correlation_id"))
+            if 65001 in self.auth.get("error_codes", []):
                 # AAD requires user consent for U/P flow
-                log.error("Visit this to consent:", self.app.get_authorization_request_url(config["scope"]))
+                log.error("Visit this to consent:{}".format('...'))
 
     def get_cert_creds(self):
         """
         Get cert creds dict
         :return:
         """
-        if all([os.path.isfile(cert_path), os.path.isfile(cert_key_path)]):
-            with open(cert_path) as f:
+        if all([os.path.isfile(cert['cert_path']), os.path.isfile(cert['cert_key_path'])]):
+            with open(cert['cert_path']) as f:
                 cert_file = f.read()
-            with open(cert_key_path) as f:
+            with open(cert['cert_key_path']) as f:
                 key_file = f.read()
 
                 # Create an X509 object and calculate the thumbprint
@@ -147,8 +172,15 @@ class AzureAd(object):
                 return client_credential
 
         else:
-            log.error('Missing cert/cert_key files')
+            log.error('Missing cert/cert_key files. Unable to generate cert creds..')
             return False
+
+    def test_get_user(self):
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "ConsistencyLevel": "eventual"}
+        query_str = "?$filter=displayName eq '{}'".format("Divya Shanmugaraj")
+        _endpoint = config["apiurl"] + "/users" + query_str
+        result = self.session.get(_endpoint, headers=raw_headers)
+        return result
 
     def get_aad_user(self, displayname=None, loginid=None, onprem=False):
         """
