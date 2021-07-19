@@ -6,6 +6,7 @@ app_root = os.path.split(os.path.abspath(__file__))[0]
 sys.path.insert(0, app_root)
 
 from az.rest import azureauth
+from az.helpers import pfxtopem
 
 
 def main():
@@ -20,6 +21,10 @@ def main():
 
     subparser = parser.add_subparsers(dest='command')
 
+    parse_pfx = subparser.add_parser('pfxtopem', help='Extract PFX to cert and key files')
+    parse_pfx.add_argument('-p', '--pfxpath', help='Full path to the pfx file', required=True)
+    parse_pfx.add_argument('-s', '--secret', help='Secret to open the pfx', required=True)
+
     parse_rep = subparser.add_parser('report', help='Activation report')
     parse_rep.add_argument('-d', '--dirpath', help='Directory path for output file',
                            default="\\\\corp.bloomberg.com\\ny-dfs\\Ops\\InfoSys\\Systems Engineering\\Dropboxes\\O365Activations")
@@ -30,7 +35,6 @@ def main():
     parser_mon.add_argument('-p', '--percent', help='Check threshold percentage', required=False, default=None)
     parser_mon.add_argument('-s', '--skuname', help='SKU Part name of the product', required=True, choices=sku_list)
     parser_mon.add_argument('--userauth', help='Use username password auth instead of cert auth.', action='store_true')
-
 
     group_sync = subparser.add_parser('groupsync', help='Sync AD group to cloud group')
     group_sync.add_argument('--userauth', help='Use username password auth instead of cert auth.', action='store_true')
@@ -45,21 +49,35 @@ def main():
     args = parser.parse_args()
 
     if args:
-        cert_auth = True if not args.userauth else False
-        aad = azureauth.AzureAd(cert_auth=cert_auth)
+        if args.command == 'pfxtopem:':
+            pfxtopem.pfx_to_pem(pfx_path=args.pfxpath, pfx_password=args.secret)
+        else:
+            cert_auth = True if not args.userauth else False
+            aad = azureauth.AzureAd(cert_auth=cert_auth)
+
+            if args.command == 'monitor':
+                aad.lic_mon(skuname=args.skuname, threshold=args.threshold, percentage=args.percent)
+            elif args.command == 'groupsync':
+                if all([args.adgroup, args.cloudgroup]):
+                    aad.sync_group(adgroup=args.adgroup, clgroup=args.cloudgroup, test=args.testmode)
+                elif args.filename:
+                    aad.sync_group_json(filename=args.filename)
+
+            elif args.command == 'report':
+                aad.report_license_activation(outdir=args.dirpath)
     else:
         return False
 
-    if args.command == 'monitor':
-        aad.lic_mon(skuname=args.skuname, threshold=args.threshold, percentage=args.percent)
-    elif args.command == 'groupsync':
-        if all([args.adgroup, args.cloudgroup]):
-            aad.sync_group(adgroup=args.adgroup, clgroup=args.cloudgroup, test=args.testmode)
-        elif args.filename:
-            aad.sync_group_json(filename=args.filename)
-
-    elif args.command == 'report':
-        aad.report_license_activation(outdir=args.dirpath)
+    # if args.command == 'monitor':
+    #     aad.lic_mon(skuname=args.skuname, threshold=args.threshold, percentage=args.percent)
+    # elif args.command == 'groupsync':
+    #     if all([args.adgroup, args.cloudgroup]):
+    #         aad.sync_group(adgroup=args.adgroup, clgroup=args.cloudgroup, test=args.testmode)
+    #     elif args.filename:
+    #         aad.sync_group_json(filename=args.filename)
+    #
+    # elif args.command == 'report':
+    #     aad.report_license_activation(outdir=args.dirpath)
 
 
 if __name__ == '__main__':
