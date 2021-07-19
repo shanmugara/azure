@@ -58,7 +58,7 @@ def pfx_to_pem(pfx_path, pfx_password):
         print("Exception {} while writing out file".format(e))
 
 
-def create_self_signed(subject, destpath):
+def create_self_signed(cn, destpath):
     """
     Generate a self signed cert/key amd store in destpath
     :param subject:
@@ -86,7 +86,7 @@ def create_self_signed(subject, destpath):
                     x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, u"NY"),
                     x509.NameAttribute(NameOID.LOCALITY_NAME, u"New York"),
                     x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"Bloomberg L.P."),
-                    x509.NameAttribute(NameOID.COMMON_NAME, u"azuregraph.self.signed.blp"),
+                    x509.NameAttribute(NameOID.COMMON_NAME, u"{}".format(cn)),
                 ]
             )
             cert = (
