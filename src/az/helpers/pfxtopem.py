@@ -67,6 +67,7 @@ def create_self_signed(cn, destpath):
         try:
             key_file = os.path.join(destpath, "{}_key.pem".format(cn))
             with open(key_file, "wb") as f:
+                print('Wriring key file to {}'.format(key_file))
                 f.write(
                     key.private_bytes(
                         encoding=serialization.Encoding.PEM,
@@ -100,6 +101,7 @@ def create_self_signed(cn, destpath):
             )
 
             with open(cert_file, "wb") as f:
+                print('Writing cert file to {}'.format(cert_file))
                 f.write(cert.public_bytes(serialization.Encoding.PEM))
         except Exception as e:
             print("Exception while writing cert/key file: {}".format(e))
