@@ -73,10 +73,8 @@ def create_self_signed(cn, destpath):
                 f.write(
                     key.private_bytes(
                         encoding=serialization.Encoding.PEM,
-                        format=serialization.PrivateFormat.TraditionalOpenSSL,
-                        encryption_algorithm=serialization.BestAvailableEncryption(
-                            b"passphrase"
-                        ),
+                        format=serialization.PrivateFormat.PKCS8,
+                        encryption_algorithm=serialization.NoEncryption(),
                     )
                 )
             cert_file = os.path.join(destpath, "my_cert_file.pem")
