@@ -92,7 +92,7 @@ def create_self_signed(cn, destpath):
                 .public_key(key.public_key())
                 .serial_number(x509.random_serial_number())
                 .not_valid_before(datetime.datetime.utcnow())
-                .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=10))
+                .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=365))
                 .add_extension(
                     x509.SubjectAlternativeName([x509.DNSName(u"localhost")]),
                     critical=False,
