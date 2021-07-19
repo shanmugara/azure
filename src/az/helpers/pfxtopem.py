@@ -57,7 +57,7 @@ def pfx_to_pem(pfx_path, pfx_password):
 
 def create_self_signed(cn, destpath):
     """
-    Generate a self signed cert/key amd store in destpath
+    Generate a self signed cert/key and store in destpath
     :param cn: CN for cert
     :param destpath: destination path
     :return:
