@@ -65,7 +65,7 @@ def create_self_signed(cn, destpath):
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     if os.path.isdir(destpath):
         try:
-            key_file = os.path.join(destpath, "my_self_key.pem")
+            key_file = os.path.join(destpath, "{}_key.pem".format(cn))
             with open(key_file, "wb") as f:
                 f.write(
                     key.private_bytes(
@@ -74,7 +74,7 @@ def create_self_signed(cn, destpath):
                         encryption_algorithm=serialization.NoEncryption(),
                     )
                 )
-            cert_file = os.path.join(destpath, "my_cert_file.pem")
+            cert_file = os.path.join(destpath, "{}_cert.pem".format(cn))
             subject = issuer = x509.Name(
                 [
                     x509.NameAttribute(NameOID.COUNTRY_NAME, u"US"),
