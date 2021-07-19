@@ -1,12 +1,9 @@
 """
 A module to extract cert and key from a PFX file.
 """
-from contextlib import contextmanager
 from pathlib import Path
 import os
-from tempfile import NamedTemporaryFile
 
-import requests
 from cryptography.hazmat.primitives.serialization import (
     Encoding,
     PrivateFormat,
@@ -61,8 +58,8 @@ def pfx_to_pem(pfx_path, pfx_password):
 def create_self_signed(cn, destpath):
     """
     Generate a self signed cert/key amd store in destpath
-    :param subject:
-    :param destpath:
+    :param cn: CN for cert
+    :param destpath: destination path
     :return:
     """
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)

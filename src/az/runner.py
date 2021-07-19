@@ -22,8 +22,12 @@ def main():
     subparser = parser.add_subparsers(dest='command')
 
     parse_pfx = subparser.add_parser('pfxtopem', help='Extract PFX to cert and key files')
-    parse_pfx.add_argument('-p', '--pfxpath', help='Full path to the pfx file', required=True)
+    parse_pfx.add_argument('-p', '--path', help='Full path to the pfx file', required=True)
     parse_pfx.add_argument('-s', '--secret', help='Secret to open the pfx', required=True)
+
+    parse_self_sign = subparser.add_parser('selfsign', help='Create a self signed cert')
+    parse_self_sign.add_argument('-p', '--path', help='Full path to the cert and key file', required=True)
+    parse_self_sign.add_argument('-n', '--cn', help='CN for the self signed cert', required=True)
 
     parse_rep = subparser.add_parser('report', help='Activation report')
     parse_rep.add_argument('-d', '--dirpath', help='Directory path for output file',
@@ -50,7 +54,9 @@ def main():
 
     if args:
         if args.command == 'pfxtopem':
-            pfxtopem.pfx_to_pem(pfx_path=args.pfxpath, pfx_password=args.secret)
+            pfxtopem.pfx_to_pem(pfx_path=args.path, pfx_password=args.secret)
+        elif args.command == 'selfsign':
+            pfxtopem.create_self_signed(cn=args.cn, destpath=args.path)
         else:
             cert_auth = True if not args.userauth else False
             aad = azureauth.AzureAd(cert_auth=cert_auth)
