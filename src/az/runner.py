@@ -49,7 +49,7 @@ def main():
     args = parser.parse_args()
 
     if args:
-        if args.command == 'pfxtopem:':
+        if args.command == 'pfxtopem':
             pfxtopem.pfx_to_pem(pfx_path=args.pfxpath, pfx_password=args.secret)
         else:
             cert_auth = True if not args.userauth else False
