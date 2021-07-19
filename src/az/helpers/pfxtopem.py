@@ -67,7 +67,7 @@ def create_self_signed(cn, destpath):
         try:
             key_file = os.path.join(destpath, "{}_key.pem".format(cn))
             with open(key_file, "wb") as f:
-                print('Wriring key file to {}'.format(key_file))
+                print('Writing key file to {}'.format(key_file))
                 f.write(
                     key.private_bytes(
                         encoding=serialization.Encoding.PEM,
