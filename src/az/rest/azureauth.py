@@ -194,7 +194,7 @@ class AzureAd(object):
             filter = "?$top=999&$select=onPremisesSyncEnabled,id,userPrincipalName,businessPhones,displayName,givenName," \
                      "jobTitle,mail,mobilePhone,officeLocation,surname"
             if onprem:
-                filter += "$filter=onPremisesSyncEnabled eq true"
+                filter += "&$filter=onPremisesSyncEnabled eq true"
 
             query_str = filter
 
