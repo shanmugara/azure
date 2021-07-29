@@ -40,7 +40,7 @@ def get_adgroupmember(groupname):
     :return:
     """
     cmd = os.path.join(app_root, 'admodule.ps1')
-    cmd_out = check_output(['powershell','-c',cmd,'-groupname',groupname])
+    cmd_out = check_output(['powershell','-executionpolicy','bypass','-noprofole','-c',cmd,'-groupname',groupname])
     mems_lines = cmd_out.decode().splitlines()
     if 'failed_to_get_members' in mems_lines:
         mems_lines = False
