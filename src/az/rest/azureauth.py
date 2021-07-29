@@ -191,7 +191,7 @@ class AzureAd(object):
         elif loginid:
             query_str = "?$filter=startswith(userPrincipalname, '{}@')".format(loginid)
         else:
-            filter = "?$top=200&$select=onPremisesSyncEnabled,id,userPrincipalName,businessPhones,displayName,givenName," \
+            filter = "?$top=500&$select=onPremisesSyncEnabled,id,userPrincipalName,businessPhones,displayName,givenName," \
                      "jobTitle,mail,mobilePhone,officeLocation,surname"
             query_str = filter
         page = True
