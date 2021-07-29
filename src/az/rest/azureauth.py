@@ -193,7 +193,11 @@ class AzureAd(object):
         else:
             filter = "?$top=999&$select=onPremisesSyncEnabled,id,userPrincipalName,businessPhones,displayName,givenName," \
                      "jobTitle,mail,mobilePhone,officeLocation,surname"
+            if onprem:
+                filter += "$filter=onPremisesSyncEnabled eq true"
+
             query_str = filter
+
         page = True
         allusers_full = []
         _endpoint = config["apiurl"] + "/users" + query_str
@@ -210,12 +214,12 @@ class AzureAd(object):
 
         allusers = []
 
-        if onprem:
-            for u in allusers_full:
-                if u['onPremisesSyncEnabled'] == True:
-                    allusers.append(u)
-        else:
-            allusers = allusers_full
+        # if onprem:
+        #     for u in allusers_full:
+        #         if u['onPremisesSyncEnabled'] == True:
+        #             allusers.append(u)
+        # else:
+        allusers = allusers_full
 
         return allusers
 
