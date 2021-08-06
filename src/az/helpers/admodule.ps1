@@ -9,7 +9,7 @@ function get-groupmembers {
             $groupmems = get-qadgroupmember $groupname -indirect -type user -sizelimit 50000
             $samname = @()
             $groupmems|%{
-                $samname += $_.samaccountname
+                $samname += $_.samaccountname.tolower()
             }
             return $samname
         }
