@@ -28,7 +28,7 @@ hidden
 1. The `graphapi` package is not yet published in artifactory PyPi. So you can install the package by
 downloading the sdist package from the bbgit repo.
    
-2. Download `https://bbgithub.dev.bloomberg.com/speriyas/graphapi/blob/master/dist/azuregraph-0.0.3.tar.gz` to your host
+2. Download `https://github.com/shanmugara/azure/blob/master/dist/azuregraph-0.0.3.tar.gz` to your host
 where the package is to be installed.
    
 3. Make sure the `c:\python\venv\graphapi` venv is activated.
