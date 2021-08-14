@@ -19,24 +19,7 @@ groupsync function will only run in a Windows platform due to dependencies to ge
 7. Create `C:\python\venv\graphapi\pip.ini` with following content:
 
 ```
-[global]
-retries = 0
-timeout = 15
-
-# our own wheel repo
-# [ose]
-index-url = https://artifactory.inf.bloomberg.com/artifactory/api/pypi/bloomberg-pypi-ose/simple
-
-trusted-host = artifactory.inf.bloomberg.com
-# Don't check if pip needs an upgrade every time we install something with pip
-disable-pip-version-check = true
-disable-cache = true
-
-[list]
-format = columns
-
-[search]
-index = https://artifactory.inf.bloomberg.com/artifactory/api/pypi/bloomberg-pypi-ose/simple
+hidden
 ```
 
 
@@ -54,7 +37,7 @@ package and all its dependencies.
    
 5. You can verify the installed packages with `pip list`.
 
-6. Next we configure the BLP CA trust and connection properties for the graph api.
+6. Next we configure the CA trust and connection properties for the graph api.
 
 ## Add BLP CA cert to Python trust ##
 
@@ -81,7 +64,7 @@ cert is hidden
 <pre>
 # PROVIDE YOUR TENANCY NAME HERE (REQUIRED)
 
-<b>tenancy = "bloombergcorpdev.onmicrosoft.com"</b>
+<b>tenancy = "tenancyname.onmicrosoft.com"</b>
 
 # UPDATE THIS DICT WITH CERT FILE AND CERT KEY FILE PATHS.
 # SCOPE IS SET TO GRAPH API (DEFAULT)
@@ -109,7 +92,7 @@ config = {
 <b>    "client_id": "", </b>
     "apiurl": "https://graph.microsoft.com/v1.0",
     "cert_auth": True,
-    "proxy": {'http': 'proxy.bloomberg.com:81', 'https': 'proxy.bloomberg.com:81'},
+    "proxy": {'http': 'proxy.domain.com:81', 'https': 'proxy.domain.com:81'},
 }
 </pre>
 
