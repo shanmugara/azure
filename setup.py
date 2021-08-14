@@ -6,7 +6,7 @@ if os.name == 'nt':
     req_lst.append('colorama')
 
 setup(name='azuregraph',
-      version="0.0.3",
+      version="0.0.4",
       description='Azure Graph API wrapper.',
       url='https://none.none',
       author='RP',
