@@ -18,7 +18,7 @@ from cryptography.hazmat.primitives import hashes
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from az.helpers import my_logger
-from az.helpers.config import config, cert, user
+from az.helpers.config import config, cert, user, tenancy
 from az.helpers import powershell
 
 if platform.system().lower() == 'windows':
@@ -80,7 +80,7 @@ class AzureAd(object):
         self.session.mount("https://", HTTPAdapter(max_retries=retries))
 
         self.cert_auth = cert_auth
-
+        log.info('Current Azure tenancy: {}'.format(tenancy))
         if self.cert_auth:
             self.client_credentials = self.get_cert_creds()
             self.init_app_confidential()
@@ -193,11 +193,7 @@ class AzureAd(object):
         else:
             filter = "?$top=999&$select=onPremisesSyncEnabled,id,userPrincipalName,businessPhones,displayName,givenName," \
                      "jobTitle,mail,mobilePhone,officeLocation,surname"
-            # if onprem:
-            #     filter += "&$filter=onPremisesSyncEnabled eq true"
-
             query_str = filter
-
         page = True
         allusers_full = []
         _endpoint = config["apiurl"] + "/users" + query_str
@@ -367,7 +363,162 @@ class AzureAd(object):
             log.error('Failed to get users list from AAD')
             return False
 
-    def sync_group_json(self, filename):
+    def get_aad_roles(self):
+        """
+        Get all AAD roles
+        :return:
+        """
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token']}
+        _endpoint = config["apiurl"] + "/directoryRoleTemplates"
+
+        try:
+            result = self.session.get(url=_endpoint, headers=raw_headers)
+            if result.status_code == 200:
+                return result.json()
+            else:
+                log.error('Error while getting roles templates')
+                log.error('Status code: {}'.format(result.status_code))
+                return False
+
+
+        except Exception as e:
+            log.error('Exception while making API call - {}'.format(e))
+
+    def make_aad_roles_map(self):
+        """
+        Generate a dict of roles {display name: id}
+        :return:
+        """
+        roles = self.get_aad_roles()
+        self.aad_roles_map = {}
+        if roles['value']:
+            for role in roles['value']:
+                self.aad_roles_map[role['displayName'].lower()] = role['id']
+
+        else:
+            log.error('Unable to get roles from aad. Giving up.')
+            return False
+
+    def create_aad_group(self, groupname, role_enable=True, gtype=None):
+        """
+        Create an Azure AD group
+        :param groupname: group name
+        :param gtype: type of group to create
+        :return:
+        """
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
+        _endpoint = config["apiurl"] + "/groups"
+
+        if gtype == int(365):
+            group_type = ['Unified']
+        else:
+            group_type = []
+
+        data_dict = {
+            'displayName': groupname,
+            'description': 'Created by API',
+            'isAssignableToRole': role_enable,
+            'mailEnabled': False,
+            'mailNickname': groupname,
+            'securityEnabled': True,
+            'groupTypes': group_type
+
+        }
+
+        data_json = json.dumps(data_dict)
+        log.info('Creating group {}'.format(groupname))
+        try:
+            resp = self.session.post(url=_endpoint, headers=raw_headers, data=data_json)
+            return resp
+        except Exception as e:
+            log.error('Exception was throws while creating group {}, - {}'.format(groupname, e))
+
+    def add_member_to_role(self, member_oid, role_name):
+        """
+        Add a given object ID to a AAD Role
+        :param member_oid: object ID of user/group
+        :param role_name: template name of the role, such as "global readers" etc
+        :return:
+        """
+        if  not hasattr(self, 'aad_roles_map'):
+            self.make_aad_roles_map()
+
+        if self.aad_roles_map.get(role_name.lower()):
+            role_template_id = self.aad_roles_map[role_name.lower()]
+        else:
+            log.error('Unable to find template id for role "{}"'.format(role_name))
+            return False
+
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
+        _endpoint = config["apiurl"] + "/directoryRoles/roleTemplateId={}/members/$ref".format(role_template_id)
+
+        data_dict = {
+            "@odata.id": "https://graph.microsoft.com/v1.0/directoryObjects/{}".format(member_oid)
+        }
+        data_json = json.dumps(data_dict)
+
+        try:
+            resp = self.session.post(url = _endpoint, headers = raw_headers, data = data_json)
+            if resp.status_code == int(204):
+                log.info('Status code: {}'.format(resp.status_code))
+                return
+            else:
+                log.error('Status code: {}'.format(resp.status_code))
+                return resp.json()
+        except Exception as e:
+            log.error('Exception was thrown while assigning role "{}" to object "{}"'.format(role_name, member_oid))
+            return False
+
+    def set_group_owner(self, groupname, owner_id):
+        """
+        Set owner for the given group object
+        Permission type	Permissions (from least to most privileged)
+        Delegated (work or school account)	Group.ReadWrite.All, Directory.ReadWrite.All, Directory.AccessAsUser.All
+        Delegated (personal Microsoft account)	Not supported.
+        Application	Group.ReadWrite.All, Directory.ReadWrite.All
+        :param groupname: group to update
+        :param owner_id: samaccountname of the owner to assign
+        :return:
+        """
+        group_obj = self.get_aad_group(groupname=groupname)
+        if group_obj['value']:
+            group_oid = group_obj['value'][0]['id']
+        else:
+            log.error('did not get group object for group "{}"'.format(groupname))
+            return False
+        user_oid = False
+        if hasattr(self, 'upn_id_map'):
+            try:
+                user_oid = self.upn_id_map[owner_id.lower()]
+            except KeyError:
+                log.warning('User "{}" not found in cache, will try to fetch from Azure AD'.format(owner_id))
+        else:
+            log.warning('No cached user upn id map was found. Will fetch user from Azure AD')
+
+        if not user_oid:
+            user_obj = self.get_aad_user(loginid=owner_id)
+            if user_obj:
+                user_oid = user_obj[0]['id']
+            else:
+                log.error('Unable find user object for "{}". Giving up.'.format(owner_id))
+                return False
+
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
+        _endpoint = config['apiurl'] + '/groups/{}/owners/$ref'.format(group_oid)
+
+        data_dict = {"@odata.id": "https://graph.microsoft.com/v1.0/users/{}".format(user_oid)}
+        data_json = json.dumps(data_dict)
+
+        try:
+            result = self.session.post(url=_endpoint, headers=raw_headers, data=data_json)
+            log.info("Set owner result code: {}".format(result.status_code))
+
+        except Exception as e:
+            log.error('Exception while making REST call - {}'.format(e))
+            return False
+
+    @Timer.add_timer
+    def sync_group_json(self, filename, test=False):
         """
         Use a json file as input for calling sync_group. file format is adgroup:cldgroup
         sample input json file format"
@@ -387,7 +538,7 @@ class AzureAd(object):
                     syn_group_dict = json.load(f)
                     log.info('processing groups from sync file..')
                     for g in syn_group_dict:
-                        self.sync_group(adgroup=g, clgroup=syn_group_dict[g], test=False)
+                        self.sync_group(adgroup=g, clgroup=syn_group_dict[g], test=test)
                     log.info('finished processing sync file..')
 
             except Exception as e:
@@ -450,7 +601,7 @@ class AzureAd(object):
 
             for u in list(mem_not_in_cld):
                 try:
-                    mem_to_add_to_cld.append(self.upn_id_map[u])
+                    mem_to_add_to_cld.append(self.upn_id_map[u.lower()])
                 except KeyError:
                     not_in_aad.append(u)
             if not_in_aad:
@@ -769,12 +920,18 @@ class AzureAd(object):
                 file_out_lines.append('{}\n'.format(l))
 
             epoch_now = str(int((datetime.now()).timestamp()))
-            fname_csv = 'licact_report_{}.csv'.format(epoch_now)
-            # fname_json = 'licact_report_{}.json'.format(epoch_now)
+            fname_csv = 'licact_report.csv'
 
             if os.path.isdir(outdir):
                 outfile_csv = os.path.join(outdir, fname_csv)
+
+                if os.path.isfile(outfile_csv):
+                    ren_file_name = os.path.join(outdir, 'licact_report_{}.csv'.format(epoch_now))
+                    log.info('Renaming old file to {}'.format(ren_file_name))
+                    os.rename(outfile_csv, ren_file_name)
+
                 with open(outfile_csv, 'w') as f:
+                    log.info('Writing report file {}'.format(outfile_csv))
                     f.writelines(file_out_lines)
             else:
                 log.error('Destination path "{}" doesnt exist or unreachable'.format(outdir))

@@ -1,6 +1,6 @@
 param($groupname)
 
-asnp quest*
+# asnp quest*
 
 # a simple func to return all users direct and indirect from AD group
 function get-groupmembers {
