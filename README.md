@@ -59,7 +59,7 @@ package and all its dependencies.
 ## Add BLP CA cert to Python trust ##
 
 1. All connections to Azure grpah api traverse an SSL proxy, and the certs are replaced by an
-SSL intercept cert issued by BLP. In order for the Python `requests` to trust this cert, we need to add
+SSL intercept cert issued by . In order for the Python `requests` to trust this cert, we need to add
    it to Py cert trust.
    
 2. Edit `c:\python\venv\graphapi\lib\site-packages\certifi\cacert.pem`.
