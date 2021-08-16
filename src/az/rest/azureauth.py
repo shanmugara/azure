@@ -1,3 +1,5 @@
+import time
+
 import msal
 import requests
 import json
@@ -399,7 +401,7 @@ class AzureAd(object):
             log.error('Unable to get roles from aad. Giving up.')
             return False
 
-    def create_aad_group(self, groupname, role_enable=True, gtype=None):
+    def create_aad_group(self, groupname, role_enable=True, gtype=None, assign_role=None):
         """
         Create an Azure AD group
         :param groupname: group name
@@ -429,6 +431,27 @@ class AzureAd(object):
         log.info('Creating group {}'.format(groupname))
         try:
             resp = self.session.post(url=_endpoint, headers=raw_headers, data=data_json)
+
+            if all([role_enable, assign_role]):
+                log.info('Assigning role {} to group {}'.format(assign_role, groupname))
+                group_oid = None
+                timeout = False
+                count = 0
+                while all([not group_oid, not timeout]):
+                    try:
+                        group_obj = self.get_aad_group(groupname=groupname)
+                        group_oid = group_obj['value'][0]['id']
+                        resp_add_role = self.add_member_to_role(member_oid=group_oid, role_name=assign_role)
+                        log.info('Add group to role response: {}'.format(resp_add_role))
+                    except Exception as e:
+                        if count == 5:
+                            timeout = True
+                            log.error('Timeout reached. Unable to get group object. Exiting')
+                            continue
+                        log.info('Waiting 5 seconds before retrying..')
+                        count += 1
+                        time.sleep(5)
+
             return resp
         except Exception as e:
             log.error('Exception was throws while creating group {}, - {}'.format(groupname, e))
