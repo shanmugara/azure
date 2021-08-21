@@ -975,7 +975,7 @@ class AzureAd(object):
             log.error('Exception while making REST call - {}'.format(e))
             return False
 
-    def app_add_cert(self, certfile, keyfile):
+    def app_add_cert(self, certfile, keyfile, appid=None):
         """
         Add a new cert to the application in AAD
         :param certfile: new cert file path
@@ -992,8 +992,14 @@ class AzureAd(object):
             log.error('Unable to find either certfile or keyfile path. Exiting')
             return False
 
+        if not appid:
+            app_obj = self.get_app(clientid=config['client_id'])
+            app_id = app_obj['id']
+        else:
+            app_id = appid
+
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
-        _endpoint = config["apiurl"] + '/applications/{}/addKey'.format(config['app_id'])
+        _endpoint = config["apiurl"] + '/applications/{}/addKey'.format(app_id)
 
         data_json = json.dumps(data_dict)
 
@@ -1009,14 +1015,20 @@ class AzureAd(object):
             log.error('Exception {} while adding cert to app "{}"'.format(e, config['client_id']))
             return False
 
-    def app_remove_cert(self, certid):
+    def app_remove_cert(self, certid, appid=None):
         """
         Remove a given cert from the app
         :param certid: id of the cert to remove
         :return:
         """
+        if not appid:
+            app_obj = self.get_app(clientid=config['client_id'])
+            app_id = app_obj['id']
+        else:
+            app_id = appid
+
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
-        _endpoint = config["apiurl"] + '/applications/{}/removeKey'.format(config['app_id'])
+        _endpoint = config["apiurl"] + '/applications/{}/removeKey'.format(app_id)
 
         jwt = pfxtopem.get_jwt(keyfile=cert['cert_key_path'])
 
@@ -1071,6 +1083,7 @@ class AzureAd(object):
     def rotate_this_cert(self, days=30):
         """
         Check the cert used by this app. If it is close to expire, rotate
+        :param days: Number days remaining in the cert before it is rotated
         :return:
         """
         # Get cert thumb print
@@ -1115,7 +1128,7 @@ class AzureAd(object):
 
         # Add new cert to app
         log.info('Adding the new cert to app client_id:{}'.format(config['client_id']))
-        resp = self.app_add_cert(certfile=new_cert_path, keyfile=new_key_path)
+        resp = self.app_add_cert(certfile=new_cert_path, keyfile=new_key_path, appid=this_app['id'])
         if not resp:
             log.error('Failed to add the new cert to app clinet_id:{}. exiting..'.format(config['client_id']))
             return
@@ -1135,7 +1148,7 @@ class AzureAd(object):
 
         # remove old cert from app
         log.info('Removing old cert keyid {} from app client_id:{}'.format(this_cert['keyId'], config['client_id']))
-        resp = self.app_remove_cert(certid=this_cert['keyId'])
+        resp = self.app_remove_cert(certid=this_cert['keyId'], appid=this_app['id'])
         if not resp:
             log.error('Removing cert failed..')
         elif int(resp.status_code) == 204:
