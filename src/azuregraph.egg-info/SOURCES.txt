@@ -1,4 +1,5 @@
 MANIFEST.in
+README.md
 setup.py
 src/az/__init__.py
 src/az/runner.py
@@ -6,10 +7,14 @@ src/az/helpers/__init__.py
 src/az/helpers/admodule.ps1
 src/az/helpers/my_logger.py
 src/az/helpers/mytest.xml
+src/az/helpers/pfxtopem.py
 src/az/helpers/powershell.py
+src/az/helpers/sharepoint.py
 src/az/helpers/__pycache__/__init__.cpython-37.pyc
 src/az/helpers/__pycache__/config.cpython-37.pyc
 src/az/helpers/__pycache__/my_logger.cpython-37.pyc
+src/az/helpers/__pycache__/pfxtopem.cpython-37.pyc
+src/az/helpers/__pycache__/powershell.cpython-37.pyc
 src/az/rest/__init__.py
 src/az/rest/azureauth.py
 src/az/rest/__pycache__/__init__.cpython-37.pyc
