@@ -59,6 +59,12 @@ def main():
         help="Use username password auth instead of cert auth.",
         action="store_true",
     )
+    parse_rep.add_argument(
+        "--certrotate",
+        help="Automatically rotate auth cert if close to expire.",
+        action="store_true",
+    )
+    parse_rep.add_argument("--days", help="Remaining number of days before a cert is rotated", type=int, default=30)
 
     parser_mon = subparser.add_parser("monitor", help="Monitor free licence")
     parser_mon.add_argument(
@@ -83,6 +89,12 @@ def main():
         help="Use username password auth instead of cert auth.",
         action="store_true",
     )
+    parser_mon.add_argument(
+        "--certrotate",
+        help="Automatically rotate auth cert if close to expire.",
+        action="store_true",
+    )
+    parser_mon.add_argument("--days", help="Remaining number of days before a cert is rotated", type=int, default=30)
 
     group_sync = subparser.add_parser("groupsync", help="Sync AD group to cloud group")
     group_sync.add_argument(
