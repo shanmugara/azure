@@ -22,6 +22,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 from az.helpers import my_logger
 from az.helpers.config import config, cert, user, tenancy
 from az.helpers import powershell
+from az.helpers import pfxtopem
 
 if platform.system().lower() == 'windows':
     LOG_DIR = os.path.join('c:\\', 'logs', 'azgraph')
@@ -69,7 +70,7 @@ class AzureAd(object):
 
             return timed_func
 
-    def __init__(self, proxy=config["proxy"], cert_auth=config["cert_auth"]):
+    def __init__(self, proxy=config["proxy"], cert_auth=config["cert_auth"], auto_rotate=True):
         # Initialize authentication and get token
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         self.session = requests.Session()
@@ -83,6 +84,7 @@ class AzureAd(object):
 
         self.cert_auth = cert_auth
         log.info('Current Azure tenancy: {}'.format(tenancy))
+
         if self.cert_auth:
             self.client_credentials = self.get_cert_creds()
             self.init_app_confidential()
@@ -91,6 +93,10 @@ class AzureAd(object):
             self.init_app()
 
         self.init_token()
+
+        if auto_rotate:
+            log.info('Automated cert rotation is enabled. Checking cert valididty.')
+            self.rotate_this_cert(days=30)
 
     def init_app(self):
         """
@@ -463,7 +469,7 @@ class AzureAd(object):
         :param role_name: template name of the role, such as "global readers" etc
         :return:
         """
-        if  not hasattr(self, 'aad_roles_map'):
+        if not hasattr(self, 'aad_roles_map'):
             self.make_aad_roles_map()
 
         if self.aad_roles_map.get(role_name.lower()):
@@ -481,7 +487,7 @@ class AzureAd(object):
         data_json = json.dumps(data_dict)
 
         try:
-            resp = self.session.post(url = _endpoint, headers = raw_headers, data = data_json)
+            resp = self.session.post(url=_endpoint, headers=raw_headers, data=data_json)
             if resp.status_code == int(204):
                 log.info('Status code: {}'.format(resp.status_code))
                 return
@@ -489,7 +495,8 @@ class AzureAd(object):
                 log.error('Status code: {}'.format(resp.status_code))
                 return resp.json()
         except Exception as e:
-            log.error('Exception was thrown while assigning role "{}" to object "{}"'.format(role_name, member_oid))
+            log.error(
+                'Exception was thrown while assigning role "{}" to object "{}" - {}'.format(role_name, member_oid, e))
             return False
 
     def set_group_owner(self, groupname, owner_id):
@@ -967,3 +974,172 @@ class AzureAd(object):
         except Exception as e:
             log.error('Exception while making REST call - {}'.format(e))
             return False
+
+    def app_add_cert(self, certfile, keyfile):
+        """
+        Add a new cert to the application in AAD
+        :param certfile: new cert file path
+        :param keyfile: new keyfile path
+        :return:
+        """
+
+        if all([os.path.isfile(certfile), os.path.isfile(keyfile)]):
+            data_dict = pfxtopem.rotate_cert(newcert=certfile, newkey=keyfile)
+            if not data_dict:
+                log.error('Unable to get new cert_dict')
+                return False
+        else:
+            log.error('Unable to find either certfile or keyfile path. Exiting')
+            return False
+
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
+        _endpoint = config["apiurl"] + '/applications/{}/addKey'.format(config['app_id'])
+
+        data_json = json.dumps(data_dict)
+
+        try:
+            result = self.session.post(url=_endpoint, data=data_json, headers=raw_headers)
+            if int(result.status_code) == 200:
+                log.info('Add cert Result: {}'.format(result.status_code))
+            else:
+                log.error('Add cert Result: {}'.format(result.status_code))
+            return result
+
+        except Exception as e:
+            log.error('Exception {} while adding cert to app "{}"'.format(e, config['client_id']))
+            return False
+
+    def app_remove_cert(self, certid):
+        """
+        Remove a given cert from the app
+        :param certid: id of the cert to remove
+        :return:
+        """
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
+        _endpoint = config["apiurl"] + '/applications/{}/removeKey'.format(config['app_id'])
+
+        jwt = pfxtopem.get_jwt(keyfile=cert['cert_key_path'])
+
+        data_dict = {
+            "keyId": certid,
+            "proof": jwt
+        }
+
+        data_json = json.dumps(data_dict)
+
+        try:
+            result = self.session.post(url=_endpoint, data=data_json, headers=raw_headers)
+            if int(result.status_code) == 204:
+                log.info('Remove cert Result: {}'.format(result.status_code))
+            else:
+                log.error('Remove cert Result: {}'.format(result.status_code))
+            return result
+
+        except Exception as e:
+            log.error('Exception {} while deleting cert id "{}"'.format(e, certid))
+            return False
+
+    def get_app(self, clientid):
+        """
+        Get the AAD application reg object
+        :param app_id:
+        :return:
+        """
+
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
+        _endpoint = config["apiurl"] + '/applications'
+
+        try:
+            result = self.session.get(url=_endpoint, headers=raw_headers)
+            if int(result.status_code) == 200:
+                apps = result.json()
+                for app in apps['value']:
+                    if app['appId'] == clientid:
+                        return app
+
+                log.error('Unable to find app reg matching clientid {}'.format(clientid))
+                return False
+
+            else:
+                log.error('Get apps result: {}'.format(result.status_code))
+                return False
+
+        except Exception as e:
+            log.error('Exception {} while getting app reg object id:"{}"'.format(e, config['app_id']))
+            return False
+
+    def rotate_this_cert(self, days=30):
+        """
+        Check the cert used by this app. If it is close to expire, rotate
+        :return:
+        """
+        # Get cert thumb print
+        this_cert_thumbprint = pfxtopem.cert_thumbprint(cert['cert_path']).upper()
+
+        # Get the app object
+        this_app = self.get_app(config['client_id'])
+
+        # Get the expiry for this cert
+        this_cert = {}
+        for app_cert in this_app['keyCredentials']:
+            if app_cert['customKeyIdentifier'] == this_cert_thumbprint:
+                this_cert = app_cert
+                break
+
+        if not this_cert:
+            log.error('Did not find a matching cert in app reg. Exiting')
+            return
+
+        exp_time = datetime.strptime(this_cert['endDateTime'], '%Y-%m-%dT%H:%M:%SZ')
+        now_time = datetime.now()
+        diff_time = exp_time - now_time
+        if diff_time.days <= days:
+            log.warning('Current cert validity remaining days: {}'.format(diff_time.days))
+            log.warning('Current cert will be rotated')
+        else:
+            log.info('Current cert is still valid. Remaining days: {}'.format(diff_time.days))
+            return
+
+        # if close to expire, generate new cert
+        log.info('Generating new cert and key files')
+        cert_dir = os.path.split(cert['cert_path'])[0]
+        cn = datetime.strftime(now_time, '%Y%m%d-%H%M%S')
+        pfxtopem.create_self_signed(cn=cn, destpath=cert_dir)
+
+        new_cert_path = os.path.join(cert_dir, cn + '_cert.pem')
+        new_key_path = os.path.join(cert_dir, cn + '_key.pem')
+
+        if not all([os.path.isfile(new_cert_path), os.path.isfile(new_key_path)]):
+            log.error('Did not find new cert/key generated in path {}'.format(cert_dir))
+            return
+
+        # Add new cert to app
+        log.info('Adding the new cert to app client_id:{}'.format(config['client_id']))
+        resp = self.app_add_cert(certfile=new_cert_path, keyfile=new_key_path)
+        if not resp:
+            log.error('Failed to add the new cert to app clinet_id:{}. exiting..'.format(config['client_id']))
+            return
+
+        # Rename cert files
+        log.info('Renaming cert files..')
+        bak_cert_fname = cert['cert_path'] + '.' + cn
+        bak_key_fname = cert['cert_key_path'] + '.' + cn
+        log.info('Renaming old cert file {} to {}'.format(cert['cert_path'], bak_cert_fname))
+        os.rename(cert['cert_path'], bak_cert_fname)
+        log.info('Renaming old key file {} to {}'.format(cert['cert_key_path'], bak_key_fname))
+
+        log.info('Renaming new cert file {} to {}'.format(new_cert_path, cert['cert_path']))
+        os.rename(new_cert_path, cert['cert_path'])
+        log.info('Renaming new key file {} to {}'.format(new_key_path, cert['cert_key_path']))
+        os.rename(new_key_path, cert['cert_key_path'])
+
+        # remove old cert from app
+        log.info('Removing old cert keyid {} from app client_id:{}'.format(this_cert['keyId'], config['client_id']))
+        resp = self.app_remove_cert(certid=this_cert['keyId'])
+        if not resp:
+            log.error('Removing cert failed..')
+        elif int(resp.status_code) == 204:
+            log.info('Successfully deleted old cert keyid:{} from app client_id:{}'.format(this_cert['keyId'],
+                                                                                          config['client_id']))
+        else:
+            log.error('Removing old cert failed with status code {}'.format(resp.status_code))
