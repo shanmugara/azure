@@ -70,7 +70,7 @@ class AzureAd(object):
 
             return timed_func
 
-    def __init__(self, proxy=config["proxy"], cert_auth=config["cert_auth"], auto_rotate=True):
+    def __init__(self, proxy=config["proxy"], cert_auth=config["cert_auth"], auto_rotate=False, days=30):
         # Initialize authentication and get token
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         self.session = requests.Session()
@@ -96,7 +96,7 @@ class AzureAd(object):
 
         if auto_rotate:
             log.info('Automated cert rotation is enabled. Checking cert valididty.')
-            self.rotate_this_cert(days=30)
+            self.rotate_this_cert(days=days)
 
     def init_app(self):
         """

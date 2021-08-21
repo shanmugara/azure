@@ -91,6 +91,13 @@ def main():
         action="store_true",
     )
     group_sync.add_argument(
+        "--certrotate",
+        help="Automatically rotate auth cert if close to expire.",
+        action="store_true",
+    )
+    group_sync.add_argument("--days", help="Remaining number of days before a cert is rotated", type=int, default=30)
+
+    group_sync.add_argument(
         "-c", "--cloudgroup", help="Cloud group name", required=False, type=str
     )
     group_sync.add_argument(
@@ -121,7 +128,8 @@ def main():
             pfxtopem.create_self_signed(cn=args.cn, destpath=args.path)
         else:
             cert_auth = True if not args.userauth else False
-            aad = azureauth.AzureAd(cert_auth=cert_auth)
+            cert_rotate = True if args.certrotate else False
+            aad = azureauth.AzureAd(cert_auth=cert_auth, auto_rotate=cert_rotate, days=args.days)
 
             if args.command == "monitor":
                 aad.lic_mon(
