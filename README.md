@@ -204,13 +204,13 @@ and in Python venv. The old cert is also removed from the registered app in AAD.
 You can force the certificate to be rotated on-demand using the following **callgraph** commands:
 
    `c:\python\venv\graphapi\scripts\callgraph.exe certrotate`
-   This command will rotate the cert if its validity is less than or equal to **30 days** (default).
+   <br>This command will rotate the cert if its validity is less than or equal to **30 days** (default).
 
    `c:\python\venv\graphapi\scripts\callgraph.exe certrotate --days=60`
-   This command will rotate the cert if its validity is less than or equal to **60 days**.
+   <br>This command will rotate the cert if its validity is less than or equal to **60 days**.
 
    `c:\python\venv\graphapi\scripts\callgraph.exe certrotate -f`
-   This command will rotate the cert **immediately**, regardless of the remaining validity period.
+   <br>This command will rotate the cert **immediately**, regardless of the remaining validity period.
 
 
 
