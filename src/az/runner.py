@@ -47,6 +47,12 @@ def main():
         "-n", "--cn", help="CN for the self signed cert", required=True
     )
 
+    parse_certrotate = subparser.add_parser("certrotate", help="Rotate ceurrent cert and key. (self-signed cert only)")
+    parse_certrotate.add_argument("-d", "--days", help="Remaining number of days before a cert is rotated", type=int,
+                                  default=30)
+    parse_certrotate.add_argument("-f", "--force", help="Force cert rotation regardless of validity",
+                                  action="store_true")
+
     parse_rep = subparser.add_parser("report", help="Activation report")
     parse_rep.add_argument(
         "-d",
@@ -139,9 +145,20 @@ def main():
         elif args.command == "selfsign":
             pfxtopem.create_self_signed(cn=args.cn, destpath=args.path)
         else:
-            cert_auth = True if not args.userauth else False
-            cert_rotate = True if args.certrotate else False
-            aad = azureauth.AzureAd(cert_auth=cert_auth, auto_rotate=cert_rotate, days=args.days)
+            try:
+                cert_auth = True if not args.userauth else False
+            except AttributeError:
+                cert_auth = True
+            try:
+                cert_rotate = True if args.certrotate else False
+            except AttributeError:
+                cert_rotate = False
+            try:
+                days = args.days
+            except AttributeError:
+                days = 30
+
+            aad = azureauth.AzureAd(cert_auth=cert_auth, auto_rotate=cert_rotate, days=days)
 
             if args.command == "monitor":
                 aad.lic_mon(
@@ -161,6 +178,10 @@ def main():
 
             elif args.command == "report":
                 aad.report_license_activation(outdir=args.dirpath)
+
+            elif args.command == "certrotate":
+                force = True if args.force else False
+                aad.rotate_this_cert(days=days, force=force)
     else:
         return False
 

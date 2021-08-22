@@ -181,6 +181,38 @@ To run in test mode, include `-t` arg, as in:
 OR
 
 `c:\python\venv\graphapi\scripts\callgraph.exe groupsync -f c:\path\to\filename.json -t`
-   
+
+
+# Certificate rotation #
+
+The code supports automatically rotating certificates in the registered app in AAD. The certificate rotation function **supports 
+only self-signed** certs as of now.
+
+## Rotating cert as part of callgraph commands ##
+
+The cert can be rotated automatically while calling any **callgraph** command, such as **groupsync, report or monitor**.
+In order to rotate the cert during these commands, pass teh following additional args:
+
+   `c:\python\venv\graphapi\scripts\callgraph.exe groupsync -f c:\path\to\filename.json --certrotate --days=30`
+
+The above **groupsync** call will check the validity of the current certificate, and if its validity is **less than or equal to 30
+days**, the certificate will be rotated. A new self-signed cert is generated, and replaces the old cert in the Python venv. The old
+cert is also removed from the registered app in AAD. The `--days` defaults to **30** if not specified.
+
+## Forcing a certificate rotation on-demand ##
+
+You can force the certificate to be rotated on-demand using the following **callgraph** commands:
+
+   `c:\python\venv\graphapi\scripts\callgraph.exe certrotate`
+   This command will rotate the cert if its validity is less than or equal to **30 days** (default).
+
+   `c:\python\venv\graphapi\scripts\callgraph.exe certrotate --days=60`
+   This command will rotate the cert if its validity is less than or equal to **60 days**.
+
+   `c:\python\venv\graphapi\scripts\callgraph.exe certrotate -f`
+   This command will rotate the cert **immediately**, regardless of the remaining validity period.
+
+
+
 
 

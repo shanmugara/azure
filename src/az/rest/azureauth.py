@@ -1006,9 +1006,9 @@ class AzureAd(object):
         try:
             result = self.session.post(url=_endpoint, data=data_json, headers=raw_headers)
             if int(result.status_code) == 200:
-                log.info('Add cert Result: {}'.format(result.status_code))
+                log.info('Add cert result code: {}'.format(result.status_code))
             else:
-                log.error('Add cert Result: {}'.format(result.status_code))
+                log.error('Add cert result code: {}'.format(result.status_code))
             return result
 
         except Exception as e:
@@ -1042,9 +1042,9 @@ class AzureAd(object):
         try:
             result = self.session.post(url=_endpoint, data=data_json, headers=raw_headers)
             if int(result.status_code) == 204:
-                log.info('Remove cert Result: {}'.format(result.status_code))
+                log.info('Remove cert result code: {}'.format(result.status_code))
             else:
-                log.error('Remove cert Result: {}'.format(result.status_code))
+                log.error('Remove cert result code: {}'.format(result.status_code))
             return result
 
         except Exception as e:
@@ -1080,7 +1080,7 @@ class AzureAd(object):
             log.error('Exception {} while getting app reg object id:"{}"'.format(e, config['app_id']))
             return False
 
-    def rotate_this_cert(self, days=30):
+    def rotate_this_cert(self, days=30, force=False):
         """
         Check the cert used by this app. If it is close to expire, rotate
         :param days: Number days remaining in the cert before it is rotated
@@ -1106,12 +1106,16 @@ class AzureAd(object):
         exp_time = datetime.strptime(this_cert['endDateTime'], '%Y-%m-%dT%H:%M:%SZ')
         now_time = datetime.now()
         diff_time = exp_time - now_time
-        if diff_time.days <= days:
-            log.warning('Current cert validity remaining days: {}'.format(diff_time.days))
-            log.warning('Current cert will be rotated')
+        
+        if not force:
+            if diff_time.days <= days:
+                log.warning('Current cert validity remaining days: {}'.format(diff_time.days))
+                log.warning('Current cert will be rotated')
+            else:
+                log.info('Current cert is still valid. Remaining days: {}'.format(diff_time.days))
+                return
         else:
-            log.info('Current cert is still valid. Remaining days: {}'.format(diff_time.days))
-            return
+            log.info('Forced cert rotation requested. Will proceed to rotate cert.')
 
         # if close to expire, generate new cert
         log.info('Generating new cert and key files')
