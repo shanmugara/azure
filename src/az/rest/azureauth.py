@@ -1120,11 +1120,11 @@ class AzureAd(object):
         # if close to expire, generate new cert
         log.info('Generating new cert and key files')
         cert_dir = os.path.split(cert['cert_path'])[0]
-        cn = datetime.strftime(now_time, '%Y%m%d-%H%M%S')
-        pfxtopem.create_self_signed(cn=cn, destpath=cert_dir)
+        cer_prefix = datetime.strftime(now_time, '%Y%m%d-%H%M%S')
+        pfxtopem.create_self_signed(cn=this_app['displayName'], destpath=cert_dir)
 
-        new_cert_path = os.path.join(cert_dir, cn + '_cert.pem')
-        new_key_path = os.path.join(cert_dir, cn + '_key.pem')
+        new_cert_path = os.path.join(cert_dir, this_app['displayName'] + '_cert.pem')
+        new_key_path = os.path.join(cert_dir, this_app['displayName'] + '_key.pem')
 
         if not all([os.path.isfile(new_cert_path), os.path.isfile(new_key_path)]):
             log.error('Did not find new cert/key generated in path {}'.format(cert_dir))
@@ -1139,14 +1139,17 @@ class AzureAd(object):
 
         # Rename cert files
         log.info('Renaming cert files..')
-        bak_cert_fname = cert['cert_path'] + '.' + cn
-        bak_key_fname = cert['cert_key_path'] + '.' + cn
+        bak_cert_fname = cert['cert_path'] + '.' + cer_prefix
+        bak_key_fname = cert['cert_key_path'] + '.' + cer_prefix
         log.info('Renaming old cert file {} to {}'.format(cert['cert_path'], bak_cert_fname))
         os.rename(cert['cert_path'], bak_cert_fname)
+
         log.info('Renaming old key file {} to {}'.format(cert['cert_key_path'], bak_key_fname))
+        os.rename(cert['cert_key_path'], bak_key_fname)
 
         log.info('Renaming new cert file {} to {}'.format(new_cert_path, cert['cert_path']))
         os.rename(new_cert_path, cert['cert_path'])
+
         log.info('Renaming new key file {} to {}'.format(new_key_path, cert['cert_key_path']))
         os.rename(new_key_path, cert['cert_key_path'])
 
