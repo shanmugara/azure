@@ -13,7 +13,7 @@ if platform.system().lower() == 'windows':
 else:
     LOG_DIR = os.path.join(os.environ['VIRTUAL_ENV'], 'logs', 'azgraph')
 
-log = my_logger.My_logger(logdir=LOG_DIR, logfile=__name__)
+log = my_logger.My_logger(logdir=LOG_DIR, logfile='powershell')
 
 def add_timer(func):
     functools.wraps(func)
