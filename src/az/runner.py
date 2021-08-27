@@ -175,8 +175,8 @@ def main():
             except AttributeError:
                 days = 30
 
-            if args.command in ["monitor", "groupsync", "report", "certrotate"]:
-                aad = azureauth.AzureAd(cert_auth=cert_auth, auto_rotate=cert_rotate, days=days)
+            # if args.command in ["monitor", "groupsync", "report", "certrotate"]:
+            #     aad = azureauth.AzureAd(cert_auth=cert_auth, auto_rotate=cert_rotate, days=days)
 
             if args.command == "monitor":
                 runner.iam.lic_mon(
