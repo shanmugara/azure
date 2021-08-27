@@ -5,14 +5,15 @@ import os
 app_root = os.path.split(os.path.abspath(__file__))[0]
 sys.path.insert(0, app_root)
 
-from az.helpers import azureauth
 from az.helpers import pki_helper
 from az.helpers import aadiam
+
 
 class Runner(object):
     """
     Main runner class
     """
+
     def __init__(self, iam=False, sps=False, cert_auth=True, auto_rotate=False, days=30):
         self.pki = pki_helper.Cert()
         if iam:

@@ -12,9 +12,8 @@ from datetime import datetime
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from az.helpers import my_logger
-from az.helpers.config import config, cert, user, tenancy
+from az.helpers.config import config
 from az.helpers import powershell
-from az.helpers import pki_helper
 from az.helpers.azureauth import AzureAd
 
 if platform.system().lower() == 'windows':
