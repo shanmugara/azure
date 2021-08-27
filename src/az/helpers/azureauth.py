@@ -145,7 +145,7 @@ class AzureAd(object):
             log.error(self.auth.get("correlation_id"))
             if 65001 in self.auth.get("error_codes", []):
                 # AAD requires user consent for U/P flow
-                log.error("Visit this to consent:{}".format(self.app.initiate_auth_code_flow(scopes=user["scope"])))
+                log.error("Visit this to consent:{}".format(self.app.get_authorization_request_url(scopes=user["scope"])))
 
     def get_cert_creds(self):
         """
