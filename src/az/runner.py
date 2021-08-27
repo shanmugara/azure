@@ -152,16 +152,12 @@ def main():
     if args:
         if args.command in ["pfxtopem", "selfsign"]:
             runner = Runner()
-        elif args.command in ["monitor", "groupsync", "report", "certrotate"]:
-            runner = Runner(iam=True)
-        else:
-            return
+            if args.command == "pfxtopem":
+                runner.pki.pfx_to_pem(pfx_path=args.path, pfx_password=args.secret)
+            elif args.command == "selfsign":
+                runner.pki.create_self_signed(cn=args.cn, destpath=args.path)
 
-        if args.command == "pfxtopem":
-            runner.pki.pfx_to_pem(pfx_path=args.path, pfx_password=args.secret)
-        elif args.command == "selfsign":
-            runner.pki.create_self_signed(cn=args.cn, destpath=args.path)
-        else:
+        elif args.command in ["monitor", "groupsync", "report", "certrotate"]:
             try:
                 cert_auth = True if not args.userauth else False
             except AttributeError:
@@ -175,8 +171,7 @@ def main():
             except AttributeError:
                 days = 30
 
-            # if args.command in ["monitor", "groupsync", "report", "certrotate"]:
-            #     aad = azureauth.AzureAd(cert_auth=cert_auth, auto_rotate=cert_rotate, days=days)
+            runner = Runner(iam=True, cert_auth=cert_auth, auto_rotate=cert_rotate, days=days)
 
             if args.command == "monitor":
                 runner.iam.lic_mon(
