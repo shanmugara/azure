@@ -5,8 +5,18 @@ import os
 app_root = os.path.split(os.path.abspath(__file__))[0]
 sys.path.insert(0, app_root)
 
-from az.rest import azureauth
-from az.helpers import pfxtopem
+from az.helpers import azureauth
+from az.helpers import pki_helper
+from az.helpers import aadiam
+
+class Runner(object):
+    """
+    Main runner class
+    """
+    def __init__(self, iam=False, sps=False):
+        self.pki = pki_helper.Cert()
+        if iam:
+            self.iam = aadiam.Aadiam()
 
 
 def main():
@@ -140,10 +150,17 @@ def main():
     args = parser.parse_args()
 
     if args:
+        if args.command in ["pfxtopem", "selfsign"]:
+            runner = Runner()
+        elif args.command in ["monitor", "groupsync", "report", "certrotate"]:
+            runner = Runner(iam=True)
+        else:
+            return
+
         if args.command == "pfxtopem":
-            pfxtopem.pfx_to_pem(pfx_path=args.path, pfx_password=args.secret)
+            runner.pki.pfx_to_pem(pfx_path=args.path, pfx_password=args.secret)
         elif args.command == "selfsign":
-            pfxtopem.create_self_signed(cn=args.cn, destpath=args.path)
+            runner.pki.create_self_signed(cn=args.cn, destpath=args.path)
         else:
             try:
                 cert_auth = True if not args.userauth else False
@@ -158,30 +175,31 @@ def main():
             except AttributeError:
                 days = 30
 
-            aad = azureauth.AzureAd(cert_auth=cert_auth, auto_rotate=cert_rotate, days=days)
+            if args.command in ["monitor", "groupsync", "report", "certrotate"]:
+                aad = azureauth.AzureAd(cert_auth=cert_auth, auto_rotate=cert_rotate, days=days)
 
             if args.command == "monitor":
-                aad.lic_mon(
+                runner.iam.lic_mon(
                     skuname=args.skuname,
                     threshold=args.threshold,
                     percentage=args.percent,
                 )
             elif args.command == "groupsync":
                 if all([args.adgroup, args.cloudgroup]):
-                    aad.sync_group(
+                    runner.iam.sync_group(
                         adgroup=args.adgroup,
                         clgroup=args.cloudgroup,
                         test=args.testmode,
                     )
                 elif args.filename:
-                    aad.sync_group_json(filename=args.filename)
+                    runner.iam.sync_group_json(filename=args.filename)
 
             elif args.command == "report":
-                aad.report_license_activation(outdir=args.dirpath)
+                runner.iam.report_license_activation(outdir=args.dirpath)
 
             elif args.command == "certrotate":
                 force = True if args.force else False
-                aad.rotate_this_cert(days=days, force=force)
+                runner.iam.rotate_this_cert(days=days, force=force)
     else:
         return False
 

@@ -1,41 +1,34 @@
-import time
 
-import msal
-import requests
+import time
 import json
 import os
 import sys
-import urllib3
 import platform
-import base64
 import re
 import functools
 import timeit
 from datetime import datetime
-
-from cryptography.x509 import load_pem_x509_certificate
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import hashes
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from az.helpers import my_logger
 from az.helpers.config import config, cert, user, tenancy
 from az.helpers import powershell
-from az.helpers import pfxtopem
+from az.helpers import pki_helper
+from az.helpers.azureauth import AzureAd
 
 if platform.system().lower() == 'windows':
     LOG_DIR = os.path.join('c:\\', 'logs', 'azgraph')
 else:
     LOG_DIR = os.path.join(os.environ['VIRTUAL_ENV'], 'logs', 'azgraph')
 
-log = my_logger.My_logger(logdir=LOG_DIR, logfile='azuread')
-liclog = my_logger.My_logger(logdir=LOG_DIR, logfile='licence')
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
+logad = my_logger.My_logger(logdir=LOG_DIR, logfile='azureiam')
+loglic = my_logger.My_logger(logdir=LOG_DIR, logfile='licence')
 
-
-class AzureAd(object):
+class Aadiam(AzureAd):
+    """
+    Azure AD User and Groups management methods
+    """
     class DupObj(object):
         def __init__(self, name):
             self.name = name
@@ -51,7 +44,6 @@ class AzureAd(object):
         Generic timer
         :return: wrapped func
         """
-
         @staticmethod
         def add_timer(func):
             functools.wraps(func)
@@ -61,127 +53,14 @@ class AzureAd(object):
                 func_results = func(*args, **kwargs)
                 end_time = timeit.default_timer()
                 elapsed_time = end_time - start_time
-                log.info(
+                logad.info(
                     "Function {} - Elapsed time: {}".format(
                         func.__name__, round(elapsed_time, 3)
                     )
                 )
                 return func_results
-
             return timed_func
 
-    def __init__(self, proxy=config["proxy"], cert_auth=config["cert_auth"], auto_rotate=False, days=30):
-        # Initialize authentication and get token
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-        self.session = requests.Session()
-
-        if proxy is not None:
-            self.session.proxies = proxy
-
-        retries = Retry(total=5, backoff_factor=1, status_forcelist=[502, 503, 504])
-        self.session.mount("http://", HTTPAdapter(max_retries=retries))
-        self.session.mount("https://", HTTPAdapter(max_retries=retries))
-
-        self.cert_auth = cert_auth
-        log.info('Current Azure tenancy: {}'.format(tenancy))
-
-        if self.cert_auth:
-            self.client_credentials = self.get_cert_creds()
-            self.init_app_confidential()
-        else:
-            self.client_credentials = user["client_secret"]
-            self.init_app()
-
-        self.init_token()
-
-        if auto_rotate:
-            log.info('Automated cert rotation is enabled. Checking cert valididty.')
-            self.rotate_this_cert(days=days)
-
-    def init_app(self):
-        """
-        Init msal auth
-        :return:
-        """
-        self.app = msal.ClientApplication(
-            config["client_id"],
-            authority=config["authority"],
-            client_credential=self.client_credentials,
-            proxies=config['proxy']
-        )
-
-    def init_app_confidential(self):
-        """
-        Init msal confidential auth
-        :return:
-        """
-        self.app = msal.ConfidentialClientApplication(
-            client_id=config["client_id"],
-            authority=config["authority"],
-            client_credential=self.client_credentials,
-            proxies=config['proxy']
-        )
-
-    def init_token(self):
-        """
-        Get an auth token
-        :return:
-        """
-        self.auth = None
-        # Firstly, check the cache to see if this end user has signed in before
-        if self.cert_auth:
-            log.info('Obtaining new auth token by certificate and key pair')
-            self.auth = self.app.acquire_token_for_client(scopes=cert['scope'])
-        else:
-            accounts = self.app.get_accounts(username=user["username"])
-            if accounts:
-                log.info("Account(s) exists in cache, probably with token too. Let's try.")
-                self.auth = self.app.acquire_token_silent(config["scope"], account=accounts[0])
-
-            if not self.auth:
-                log.info("Obtaining new auth token by username and password.")
-                # See this page for constraints of Username Password Flow.
-                # https://github.com/AzureAD/microsoft-authentication-library-for-python/wiki/Username-Password-Authentication
-                pwd = base64.b64decode(user['password'].decode("utf-8")).decode()
-                self.auth = self.app.acquire_token_by_username_password(user["username"], pwd, scopes=user["scope"])
-
-        if "access_token" in self.auth:
-            log.info('Successfully obtained auth token.')
-
-        else:
-            log.error(self.auth.get("error"))
-            log.error(self.auth.get("error_description"))
-            log.error(self.auth.get("correlation_id"))
-            if 65001 in self.auth.get("error_codes", []):
-                # AAD requires user consent for U/P flow
-                log.error("Visit this to consent:{}".format('...'))
-
-    def get_cert_creds(self):
-        """
-        Get cert creds dict
-        :return:
-        """
-        if all([os.path.isfile(cert['cert_path']), os.path.isfile(cert['cert_key_path'])]):
-            with open(cert['cert_path']) as f:
-                cert_file = f.read()
-            with open(cert['cert_key_path']) as f:
-                key_file = f.read()
-
-                # Create an X509 object and calculate the thumbprint
-                cert_obj = load_pem_x509_certificate(data=bytes(cert_file, 'UTF-8'), backend=default_backend())
-                thumbprint = (cert_obj.fingerprint(hashes.SHA1()).hex())
-
-                client_credential = {
-                    "private_key": key_file,
-                    "thumbprint": thumbprint,
-                    "public_certificate": cert_file
-                }
-
-                return client_credential
-
-        else:
-            log.error('Missing cert/cert_key files. Unable to generate cert creds..')
-            return False
 
     def get_aad_user(self, displayname=None, loginid=None, onprem=False):
         """
@@ -301,7 +180,7 @@ class AzureAd(object):
                                       headers=raw_headers)
             return result.json()
         except Exception as e:
-            log.error('Exception while getting group from AAD - {}'.format(e))
+            logad.error('Exception while getting group from AAD - {}'.format(e))
             return False
 
     @Timer.add_timer
@@ -345,13 +224,13 @@ class AzureAd(object):
                         page = False
 
                 except Exception as e:
-                    log.error('Error while getting group members for "{}" - {}'.format(group_obj, e))
+                    logad.error('Error while getting group members for "{}" - {}'.format(group_obj, e))
                     page = False
 
             return ret_dict
 
         else:
-            log.error('Did not get a Azure AD group object for "{}"'.format(groupname))
+            logad.error('Did not get a Azure AD group object for "{}"'.format(groupname))
             return False
 
     @Timer.add_timer
@@ -368,7 +247,7 @@ class AzureAd(object):
                 upn_short = u['userPrincipalName'].split('@')[0].lower()
                 self.upn_id_map[upn_short] = u['id']
         else:
-            log.error('Failed to get users list from AAD')
+            logad.error('Failed to get users list from AAD')
             return False
 
     def get_aad_roles(self):
@@ -384,13 +263,13 @@ class AzureAd(object):
             if result.status_code == 200:
                 return result.json()
             else:
-                log.error('Error while getting roles templates')
-                log.error('Status code: {}'.format(result.status_code))
+                logad.error('Error while getting roles templates')
+                logad.error('Status code: {}'.format(result.status_code))
                 return False
 
 
         except Exception as e:
-            log.error('Exception while making API call - {}'.format(e))
+            logad.error('Exception while making API call - {}'.format(e))
 
     def make_aad_roles_map(self):
         """
@@ -404,7 +283,7 @@ class AzureAd(object):
                 self.aad_roles_map[role['displayName'].lower()] = role['id']
 
         else:
-            log.error('Unable to get roles from aad. Giving up.')
+            logad.error('Unable to get roles from aad. Giving up.')
             return False
 
     def create_aad_group(self, groupname, role_enable=True, gtype=None, assign_role=None):
@@ -434,12 +313,12 @@ class AzureAd(object):
         }
 
         data_json = json.dumps(data_dict)
-        log.info('Creating group {}'.format(groupname))
+        logad.info('Creating group {}'.format(groupname))
         try:
             resp = self.session.post(url=_endpoint, headers=raw_headers, data=data_json)
 
             if all([role_enable, assign_role]):
-                log.info('Assigning role {} to group {}'.format(assign_role, groupname))
+                logad.info('Assigning role {} to group {}'.format(assign_role, groupname))
                 group_oid = None
                 timeout = False
                 count = 0
@@ -448,19 +327,19 @@ class AzureAd(object):
                         group_obj = self.get_aad_group(groupname=groupname)
                         group_oid = group_obj['value'][0]['id']
                         resp_add_role = self.add_member_to_role(member_oid=group_oid, role_name=assign_role)
-                        log.info('Add group to role response: {}'.format(resp_add_role))
+                        logad.info('Add group to role response: {}'.format(resp_add_role))
                     except Exception as e:
                         if count == 5:
                             timeout = True
-                            log.error('Timeout reached. Unable to get group object. Exiting')
+                            logad.error('Timeout reached. Unable to get group object. Exiting')
                             continue
-                        log.info('Waiting 5 seconds before retrying..')
+                        logad.info('Waiting 5 seconds before retrying..')
                         count += 1
                         time.sleep(5)
 
             return resp
         except Exception as e:
-            log.error('Exception was throws while creating group {}, - {}'.format(groupname, e))
+            logad.error('Exception was throws while creating group {}, - {}'.format(groupname, e))
 
     def add_member_to_role(self, member_oid, role_name):
         """
@@ -475,7 +354,7 @@ class AzureAd(object):
         if self.aad_roles_map.get(role_name.lower()):
             role_template_id = self.aad_roles_map[role_name.lower()]
         else:
-            log.error('Unable to find template id for role "{}"'.format(role_name))
+            logad.error('Unable to find template id for role "{}"'.format(role_name))
             return False
 
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
@@ -489,13 +368,13 @@ class AzureAd(object):
         try:
             resp = self.session.post(url=_endpoint, headers=raw_headers, data=data_json)
             if resp.status_code == int(204):
-                log.info('Status code: {}'.format(resp.status_code))
+                logad.info('Status code: {}'.format(resp.status_code))
                 return
             else:
-                log.error('Status code: {}'.format(resp.status_code))
+                logad.error('Status code: {}'.format(resp.status_code))
                 return resp.json()
         except Exception as e:
-            log.error(
+            logad.error(
                 'Exception was thrown while assigning role "{}" to object "{}" - {}'.format(role_name, member_oid, e))
             return False
 
@@ -514,23 +393,23 @@ class AzureAd(object):
         if group_obj['value']:
             group_oid = group_obj['value'][0]['id']
         else:
-            log.error('did not get group object for group "{}"'.format(groupname))
+            logad.error('did not get group object for group "{}"'.format(groupname))
             return False
         user_oid = False
         if hasattr(self, 'upn_id_map'):
             try:
                 user_oid = self.upn_id_map[owner_id.lower()]
             except KeyError:
-                log.warning('User "{}" not found in cache, will try to fetch from Azure AD'.format(owner_id))
+                logad.warning('User "{}" not found in cache, will try to fetch from Azure AD'.format(owner_id))
         else:
-            log.warning('No cached user upn id map was found. Will fetch user from Azure AD')
+            logad.warning('No cached user upn id map was found. Will fetch user from Azure AD')
 
         if not user_oid:
             user_obj = self.get_aad_user(loginid=owner_id)
             if user_obj:
                 user_oid = user_obj[0]['id']
             else:
-                log.error('Unable find user object for "{}". Giving up.'.format(owner_id))
+                logad.error('Unable find user object for "{}". Giving up.'.format(owner_id))
                 return False
 
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
@@ -541,10 +420,10 @@ class AzureAd(object):
 
         try:
             result = self.session.post(url=_endpoint, headers=raw_headers, data=data_json)
-            log.info("Set owner result code: {}".format(result.status_code))
+            logad.info("Set owner result code: {}".format(result.status_code))
 
         except Exception as e:
-            log.error('Exception while making REST call - {}'.format(e))
+            logad.error('Exception while making REST call - {}'.format(e))
             return False
 
     @Timer.add_timer
@@ -564,18 +443,18 @@ class AzureAd(object):
         if os.path.isfile(filename):
             try:
                 with open(filename) as f:
-                    log.info('loading file {}'.format(filename))
+                    logad.info('loading file {}'.format(filename))
                     syn_group_dict = json.load(f)
-                    log.info('processing groups from sync file..')
+                    logad.info('processing groups from sync file..')
                     for g in syn_group_dict:
                         self.sync_group(adgroup=g, clgroup=syn_group_dict[g], test=test)
-                    log.info('finished processing sync file..')
+                    logad.info('finished processing sync file..')
 
             except Exception as e:
-                log.error('Exception while loading file. Exception: {}'.format(e))
+                logad.error('Exception while loading file. Exception: {}'.format(e))
 
         else:
-            log.error('Invalid file path.. "{}"'.format(filename))
+            logad.error('Invalid file path.. "{}"'.format(filename))
 
     @Timer.add_timer
     def sync_group(self, adgroup, clgroup, test=False):
@@ -589,7 +468,7 @@ class AzureAd(object):
         :return:
         """
 
-        log.info('Start syncing AD group "{}" to cloud group "{}"'.format(adgroup, clgroup))
+        logad.info('Start syncing AD group "{}" to cloud group "{}"'.format(adgroup, clgroup))
         if not hasattr(self, 'all_aad_grp_ids'):
             self.make_aad_grp_id_map()
 
@@ -598,13 +477,13 @@ class AzureAd(object):
 
         adgroup_members = powershell.get_adgroupmember(groupname=adgroup)
         if adgroup_members == False:
-            log.error('Unable to get on-prem AD group members for "{}". Check group name. Exiting.'.format(adgroup))
+            logad.error('Unable to get on-prem AD group members for "{}". Check group name. Exiting.'.format(adgroup))
             return False
 
         self.cldgroup_members_full = self.get_aad_members(groupname=clgroup)
 
         if self.cldgroup_members_full == False:
-            log.error('Unable to get Azure AD goup "{}". Check group name. Exiting.'.format(clgroup))
+            logad.error('Unable to get Azure AD goup "{}". Check group name. Exiting.'.format(clgroup))
             return False
 
         if len(self.cldgroup_members_full['value']) == 0:
@@ -622,7 +501,7 @@ class AzureAd(object):
         mem_not_in_cld = set(adgroup_members) - set(cldgroup_members)
         mem_not_in_ad = set(cldgroup_members) - set(adgroup_members)
 
-        log.info('Members list to be added to cloud group "{}" - {}'.format(clgroup, list(mem_not_in_cld)))
+        logad.info('Members list to be added to cloud group "{}" - {}'.format(clgroup, list(mem_not_in_cld)))
 
         # add missing members to cld group
         if mem_not_in_cld:
@@ -635,47 +514,47 @@ class AzureAd(object):
                 except KeyError:
                     not_in_aad.append(u)
             if not_in_aad:
-                log.error(
+                logad.error(
                     'on-prem AD users {} not found in Azure AD. This may be a transient AAD Sync delay.'
                     'These users will not be added to group "{}" in this cycle.'.format(not_in_aad, clgroup))
 
             if mem_to_add_to_cld:
-                log.info(
+                logad.info(
                     'Adding new members {} to cloud group "{}"'.format(
                         list(set(mem_not_in_cld) - set(list(not_in_aad))),
                         clgroup))
                 result = self.add_members_blk(uidlist=mem_to_add_to_cld, gid=self.cldgroup_members_full['group_id'],
                                               test=test)
                 if result:
-                    log.info('Bulk add result code: OK')
+                    logad.info('Bulk add result code: OK')
                 else:
-                    log.error('Bulk add result code: FAILED')
+                    logad.error('Bulk add result code: FAILED')
         else:
-            log.info('No new members to be added to group "{}"'.format(clgroup))
+            logad.info('No new members to be added to group "{}"'.format(clgroup))
 
-        log.info('Members list to be removed from cloud group "{}" - {}'.format(clgroup, list(mem_not_in_ad)))
+        logad.info('Members list to be removed from cloud group "{}" - {}'.format(clgroup, list(mem_not_in_ad)))
         if mem_not_in_ad:
-            log.info('Deleting members {} from cloud group "{}"'.format(list(mem_not_in_ad), clgroup))
+            logad.info('Deleting members {} from cloud group "{}"'.format(list(mem_not_in_ad), clgroup))
             for s_upn in list(mem_not_in_ad):
-                log.info('Deleting "{}" from group "{}"'.format(s_upn, clgroup))
+                logad.info('Deleting "{}" from group "{}"'.format(s_upn, clgroup))
 
                 try:
                     result = self.remove_member(userid=self.upn_id_map[s_upn],
                                                 gid=self.cldgroup_members_full['group_id'], test=test)
                     if test:
-                        log.info('Test mode...')
+                        logad.info('Test mode...')
                         continue
 
-                    log.info('Status code: {}'.format(result.status_code))
+                    logad.info('Status code: {}'.format(result.status_code))
 
                 except KeyError:
-                    log.error('Unable to find adsynced user {} in azure ad'.format(s_upn))
+                    logad.error('Unable to find adsynced user {} in azure ad'.format(s_upn))
                 except Exception as e:
-                    log.error(
+                    logad.error(
                         'Exception "{}" was thrown while removing id: {} from group: {}'.format(e, s_upn, clgroup))
 
         else:
-            log.info('No members need to be removed from cloud group "{}"'.format(clgroup))
+            logad.info('No members need to be removed from cloud group "{}"'.format(clgroup))
 
     def add_member(self, userid, gid):
         """
@@ -698,7 +577,7 @@ class AzureAd(object):
             return result
 
         except Exception as e:
-            log.error('Exception {} while adding users to group "{}"'.format(e, gid))
+            logad.error('Exception {} while adding users to group "{}"'.format(e, gid))
             return False
 
     @Timer.add_timer
@@ -712,33 +591,33 @@ class AzureAd(object):
 
         ret_result = True
         if len(uidlist) > 20:
-            log.info("Total number of users {} is greater than 20. We'll add in sets of 20".format(len(uidlist)))
+            logad.info("Total number of users {} is greater than 20. We'll add in sets of 20".format(len(uidlist)))
             while len(uidlist) > 0:
                 count = 20 if len(uidlist) > 20 else len(uidlist)
                 uidsubset = [uidlist.pop(0) for n in range(count)]
 
-                log.info('Adding user set {} to group'.format(uidsubset))
+                logad.info('Adding user set {} to group'.format(uidsubset))
                 result = self.add_mem_blk_sub(uidlist=uidsubset, gid=gid, test=test)
 
                 if test:
-                    log.info('Test mode...')
+                    logad.info('Test mode...')
                     continue
 
-                log.info('Status code:{}'.format(result.status_code))
+                logad.info('Status code:{}'.format(result.status_code))
                 if result == False: return False
                 if all([ret_result == True, result.status_code != int(204)]):
                     ret_result = False
         else:
             result = self.add_mem_blk_sub(uidlist=uidlist, gid=gid, test=test)
             if test:
-                log.info('Test mode...')
+                logad.info('Test mode...')
                 return ret_result
 
-            log.info('Status code:{}'.format(result.status_code))
+            logad.info('Status code:{}'.format(result.status_code))
             if result == False: return False
 
             if result.status_code != int(204):
-                log.error('Status code:{}'.format(result.status_code))
+                logad.error('Status code:{}'.format(result.status_code))
                 ret_result = False
 
         return ret_result
@@ -759,7 +638,7 @@ class AzureAd(object):
                 uid_url = 'https://graph.microsoft.com/v1.0/users/{}'.format(uid)
                 data_dict["members@odata.bind"].append(uid_url)
             except Exception as e:
-                log.error('Exception {} in add_members_blk'.format(e))
+                logad.error('Exception {} in add_members_blk'.format(e))
 
         data_json = json.dumps(data_dict)
 
@@ -769,10 +648,10 @@ class AzureAd(object):
                 return result
 
             except Exception as e:
-                log.error('Exception while adding users to group "{}"'.format(gid))
+                logad.error('Exception while adding users to group "{}"'.format(gid))
                 return False
         else:
-            log.info('Running in test mode, no writes performed.')
+            logad.info('Running in test mode, no writes performed.')
             return None
 
     @Timer.add_timer
@@ -791,10 +670,10 @@ class AzureAd(object):
                 result = self.session.delete(url=_endpoint, headers=raw_headers)
                 return result
             except Exception as e:
-                log.error('Exception while deleteing user {} from group {}'.format(userid, gid))
+                logad.error('Exception while deleteing user {} from group {}'.format(userid, gid))
                 return False
         else:
-            log.info('Running in test mode, no writes performed')
+            logad.info('Running in test mode, no writes performed')
             return None
 
     def get_open_extensions(self, oid):
@@ -811,7 +690,7 @@ class AzureAd(object):
             return result.json()
 
         except Exception as e:
-            log.error('Exception while making REST call - {}'.format(e))
+            logad.error('Exception while making REST call - {}'.format(e))
             return False
 
     def get_licences_all(self, guid=None):
@@ -828,7 +707,7 @@ class AzureAd(object):
             result = self.session.get(url=_endpoint, headers=raw_headers)
             return result.json()
         except Exception as e:
-            log.error('Exception while making REST call - {}'.format(e))
+            logad.error('Exception while making REST call - {}'.format(e))
             return False
 
     def licence_map(self):
@@ -852,11 +731,11 @@ class AzureAd(object):
         if skuname.lower() in self.lic_map.keys():
             lics = self.get_licences_all(guid=self.lic_map[skuname.lower()])
         else:
-            log.error('Invalid SKU name, or SKU {} doesnt exist in organization'.format(skuname.upper()))
+            logad.error('Invalid SKU name, or SKU {} doesnt exist in organization'.format(skuname.upper()))
             return False
 
         if lics == False:
-            liclog.error('Failed to get licence data')
+            loglic.error('Failed to get licence data')
             return
 
         free_lics = int(lics['prepaidUnits']['enabled']) - int(lics['consumedUnits'])
@@ -865,23 +744,23 @@ class AzureAd(object):
 
         if threshold:
             if (free_lics) < threshold:
-                liclog.error("{} Total: {} remaining licence count is {}."
+                loglic.error("{} Total: {} remaining licence count is {}."
                              "Failed free licence threshold of {}.".format(skuname.upper(),
                                                                            int(lics['prepaidUnits']['enabled']),
                                                                            free_lics,
                                                                            threshold))
             else:
-                liclog.info(
+                loglic.info(
                     "{} Total: {}. Remaining licence count is {}. Licence status OK".format(skuname.upper(), int(
                         lics['prepaidUnits']['enabled']), free_lics))
         if percentage:
             if (free_percentage) < int(percentage):
-                liclog.error("{} Total: {}. Free percentage is {}%"
+                loglic.error("{} Total: {}. Free percentage is {}%"
                              " Failed free licence threshold of {}%.".format(skuname.upper(),
                                                                              int(lics['prepaidUnits']['enabled']),
                                                                              free_percentage, percentage))
             else:
-                liclog.info(
+                loglic.info(
                     "{} Total: {}. Free percentage {}%. Licence status OK".format(skuname.upper(),
                                                                                   int(lics['prepaidUnits']['enabled']),
                                                                                   free_percentage))
@@ -900,7 +779,7 @@ class AzureAd(object):
             result = self.session.get(url=_endpoint, headers=raw_headers)
             return result.json()
         except Exception as e:
-            log.error('Exception while making REST call - {}'.format(e))
+            logad.error('Exception while making REST call - {}'.format(e))
             return False
 
     def report_license_activation(self, outdir):
@@ -914,7 +793,7 @@ class AzureAd(object):
 
         try:
             result = self.session.get(url=_endpoint, headers=raw_headers)
-            log.info('Response reason:{} code:{}'.format(result.reason, result.status_code))
+            logad.info('Response reason:{} code:{}'.format(result.reason, result.status_code))
             raw_l = result.text.splitlines()
             raw_l.pop(0)
             raw_dict = {}
@@ -957,14 +836,14 @@ class AzureAd(object):
 
                 if os.path.isfile(outfile_csv):
                     ren_file_name = os.path.join(outdir, 'licact_report_{}.csv'.format(epoch_now))
-                    log.info('Renaming old file to {}'.format(ren_file_name))
+                    logad.info('Renaming old file to {}'.format(ren_file_name))
                     os.rename(outfile_csv, ren_file_name)
 
                 with open(outfile_csv, 'w') as f:
-                    log.info('Writing report file {}'.format(outfile_csv))
+                    logad.info('Writing report file {}'.format(outfile_csv))
                     f.writelines(file_out_lines)
             else:
-                log.error('Destination path "{}" doesnt exist or unreachable'.format(outdir))
+                logad.error('Destination path "{}" doesnt exist or unreachable'.format(outdir))
 
                 # outfile_json = os.path.join(outdir, fname_json)
                 # with open(outfile_json, 'w') as j:
@@ -972,194 +851,5 @@ class AzureAd(object):
             return raw_dict
 
         except Exception as e:
-            log.error('Exception while making REST call - {}'.format(e))
+            logad.error('Exception while making REST call - {}'.format(e))
             return False
-
-    def app_add_cert(self, certfile, keyfile, appid=None):
-        """
-        Add a new cert to the application in AAD
-        :param certfile: new cert file path
-        :param keyfile: new keyfile path
-        :return:
-        """
-
-        if all([os.path.isfile(certfile), os.path.isfile(keyfile)]):
-            data_dict = pfxtopem.rotate_cert(newcert=certfile, newkey=keyfile)
-            if not data_dict:
-                log.error('Unable to get new cert_dict')
-                return False
-        else:
-            log.error('Unable to find either certfile or keyfile path. Exiting')
-            return False
-
-        if not appid:
-            app_obj = self.get_app(clientid=config['client_id'])
-            app_id = app_obj['id']
-        else:
-            app_id = appid
-
-        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
-        _endpoint = config["apiurl"] + '/applications/{}/addKey'.format(app_id)
-
-        data_json = json.dumps(data_dict)
-
-        try:
-            result = self.session.post(url=_endpoint, data=data_json, headers=raw_headers)
-            if int(result.status_code) == 200:
-                log.info('Add cert result code: {}'.format(result.status_code))
-            else:
-                log.error('Add cert result code: {}'.format(result.status_code))
-            return result
-
-        except Exception as e:
-            log.error('Exception {} while adding cert to app "{}"'.format(e, config['client_id']))
-            return False
-
-    def app_remove_cert(self, certid, appid=None):
-        """
-        Remove a given cert from the app
-        :param certid: id of the cert to remove
-        :return:
-        """
-        if not appid:
-            app_obj = self.get_app(clientid=config['client_id'])
-            app_id = app_obj['id']
-        else:
-            app_id = appid
-
-        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
-        _endpoint = config["apiurl"] + '/applications/{}/removeKey'.format(app_id)
-
-        jwt = pfxtopem.get_jwt(keyfile=cert['cert_key_path'])
-
-        data_dict = {
-            "keyId": certid,
-            "proof": jwt
-        }
-
-        data_json = json.dumps(data_dict)
-
-        try:
-            result = self.session.post(url=_endpoint, data=data_json, headers=raw_headers)
-            if int(result.status_code) == 204:
-                log.info('Remove cert result code: {}'.format(result.status_code))
-            else:
-                log.error('Remove cert result code: {}'.format(result.status_code))
-            return result
-
-        except Exception as e:
-            log.error('Exception {} while deleting cert id "{}"'.format(e, certid))
-            return False
-
-    def get_app(self, clientid):
-        """
-        Get the AAD application reg object
-        :param app_id:
-        :return:
-        """
-
-        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
-        _endpoint = config["apiurl"] + '/applications'
-
-        try:
-            result = self.session.get(url=_endpoint, headers=raw_headers)
-            if int(result.status_code) == 200:
-                apps = result.json()
-                for app in apps['value']:
-                    if app['appId'] == clientid:
-                        return app
-
-                log.error('Unable to find app reg matching clientid {}'.format(clientid))
-                return False
-
-            else:
-                log.error('Get apps result: {}'.format(result.status_code))
-                return False
-
-        except Exception as e:
-            log.error('Exception {} while getting app reg object id:"{}"'.format(e, config['app_id']))
-            return False
-
-    def rotate_this_cert(self, days=30, force=False):
-        """
-        Check the cert used by this app. If it is close to expire, rotate
-        :param days: Number days remaining in the cert before it is rotated
-        :return:
-        """
-        # Get cert thumb print
-        this_cert_thumbprint = pfxtopem.cert_thumbprint(cert['cert_path']).upper()
-
-        # Get the app object
-        this_app = self.get_app(config['client_id'])
-
-        # Get the expiry for this cert
-        this_cert = {}
-        for app_cert in this_app['keyCredentials']:
-            if app_cert['customKeyIdentifier'] == this_cert_thumbprint:
-                this_cert = app_cert
-                break
-
-        if not this_cert:
-            log.error('Did not find a matching cert in app reg. Exiting')
-            return
-
-        exp_time = datetime.strptime(this_cert['endDateTime'], '%Y-%m-%dT%H:%M:%SZ')
-        now_time = datetime.now()
-        diff_time = exp_time - now_time
-        
-        if not force:
-            if diff_time.days <= days:
-                log.warning('Current cert validity remaining days: {}'.format(diff_time.days))
-                log.warning('Current cert will be rotated')
-            else:
-                log.info('Current cert is still valid. Remaining days: {}'.format(diff_time.days))
-                return
-        else:
-            log.info('Forced cert rotation requested. Will proceed to rotate cert.')
-
-        # if close to expire, generate new cert
-        log.info('Generating new cert and key files')
-        cert_dir = os.path.split(cert['cert_path'])[0]
-        cer_prefix = datetime.strftime(now_time, '%Y%m%d-%H%M%S')
-        pfxtopem.create_self_signed(cn=this_app['displayName'], destpath=cert_dir)
-
-        new_cert_path = os.path.join(cert_dir, this_app['displayName'] + '_cert.pem')
-        new_key_path = os.path.join(cert_dir, this_app['displayName'] + '_key.pem')
-
-        if not all([os.path.isfile(new_cert_path), os.path.isfile(new_key_path)]):
-            log.error('Did not find new cert/key generated in path {}'.format(cert_dir))
-            return
-
-        # Add new cert to app
-        log.info('Adding the new cert to app client_id:{}'.format(config['client_id']))
-        resp = self.app_add_cert(certfile=new_cert_path, keyfile=new_key_path, appid=this_app['id'])
-        if not resp:
-            log.error('Failed to add the new cert to app clinet_id:{}. exiting..'.format(config['client_id']))
-            return
-
-        # Rename cert files
-        log.info('Renaming cert files..')
-        bak_cert_fname = cert['cert_path'] + '.' + cer_prefix
-        bak_key_fname = cert['cert_key_path'] + '.' + cer_prefix
-        log.info('Renaming old cert file {} to {}'.format(cert['cert_path'], bak_cert_fname))
-        os.rename(cert['cert_path'], bak_cert_fname)
-
-        log.info('Renaming old key file {} to {}'.format(cert['cert_key_path'], bak_key_fname))
-        os.rename(cert['cert_key_path'], bak_key_fname)
-
-        log.info('Renaming new cert file {} to {}'.format(new_cert_path, cert['cert_path']))
-        os.rename(new_cert_path, cert['cert_path'])
-
-        log.info('Renaming new key file {} to {}'.format(new_key_path, cert['cert_key_path']))
-        os.rename(new_key_path, cert['cert_key_path'])
-
-        # remove old cert from app
-        log.info('Removing old cert keyid {} from app client_id:{}'.format(this_cert['keyId'], config['client_id']))
-        resp = self.app_remove_cert(certid=this_cert['keyId'], appid=this_app['id'])
-        if not resp:
-            log.error('Removing cert failed..')
-        elif int(resp.status_code) == 204:
-            log.info('Successfully deleted old cert keyid:{} from app client_id:{}'.format(this_cert['keyId'],
-                                                                                          config['client_id']))
-        else:
-            log.error('Removing old cert failed with status code {}'.format(resp.status_code))

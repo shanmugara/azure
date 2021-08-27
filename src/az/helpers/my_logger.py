@@ -19,7 +19,7 @@ class My_logger(object):
             os.makedirs(self.LOG_DIR)
 
         # LOG_FILE = os.path.join(LOG_DIR, 'ndes_' + datetime.now().strftime('%Y%m%d%H%M%S'))
-        self.LOG_FILE = os.path.join(self.LOG_DIR, logfile + ".log")
+        self.LOG_FILE = os.path.join(self.LOG_DIR, logfile + ".logad")
         self.logger = logging.getLogger("__" + logfile + "__")
         self.logger.setLevel(logging.DEBUG)
 
