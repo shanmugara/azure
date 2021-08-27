@@ -29,6 +29,9 @@ class Aadiam(AzureAd):
     """
     Azure AD User and Groups management methods
     """
+    def __init__(self, cert_auth=True, auto_rotate=False, days=30):
+        super(Aadiam, self).__init__(cert_auth=cert_auth, auto_rotate=auto_rotate, days=days)
+
     class DupObj(object):
         def __init__(self, name):
             self.name = name

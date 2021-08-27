@@ -13,10 +13,10 @@ class Runner(object):
     """
     Main runner class
     """
-    def __init__(self, iam=False, sps=False):
+    def __init__(self, iam=False, sps=False, cert_auth=True, auto_rotate=False, days=30):
         self.pki = pki_helper.Cert()
         if iam:
-            self.iam = aadiam.Aadiam()
+            self.iam = aadiam.Aadiam(cert_auth=cert_auth, auto_rotate=auto_rotate, days=days)
 
 
 def main():
