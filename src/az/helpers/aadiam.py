@@ -1,4 +1,4 @@
-
+import logging
 import time
 import json
 import os
@@ -855,3 +855,39 @@ class Aadiam(AzureAd):
         except Exception as e:
             logad.error('Exception while making REST call - {}'.format(e))
             return False
+
+    def revoke_session(self, userid):
+        """
+        revoke all sessions for the given user id
+        :param usserid: user object id or upn
+        :return:
+        """
+
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
+        _endpoint = config["apiurl"] + "/users/{}/revokeSignInSessions".format(userid)
+
+        try:
+            logad.info('Revoking sessions for user : {}'.format(userid))
+            result = self.session.post(url=_endpoint, headers=raw_headers)
+            if int(result.status_code) == 200:
+                logad.info('Successfully revoked session')
+            else:
+                logad.error('Status code: {}'.format(result.status_code))
+            return result.json()
+        except Exception as e:
+            logad.error('Exception while making REST call - {}'.format(e))
+            return False
+
+    def revoke_sessions_blk(self, filename):
+        """
+        Revoke multiple user sessions for id in given input file
+        :param filename: File withe object IDs or upns, one per line in CSV format
+        :return:
+        """
+        if os.path.isfile(filename):
+            with open(filename) as f:
+                lines = f.readlines()
+                for line in lines:
+                    self.revoke_session(userid=line.strip())
+        else:
+            logad.error('Invalid file path or input file not found')
