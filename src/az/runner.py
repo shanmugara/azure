@@ -148,6 +148,12 @@ def main():
         type=str,
     )
 
+    revoke_session = subparser.add_parser("revoke", help="Revoke user session")
+    revoke_args = revoke_session.add_mutually_exclusive_group()
+    revoke_args.add_argument("-u", "--upn", help="AAD UPN of the user to revoke session")
+    revoke_args.add_argument("-f", "--filename", help="Filename with UPNs in CSV format for bulk operation")
+
+
     args = parser.parse_args()
 
     if args:
@@ -158,7 +164,7 @@ def main():
             elif args.command == "selfsign":
                 runner.pki.create_self_signed(cn=args.cn, destpath=args.path)
 
-        elif args.command in ["monitor", "groupsync", "report", "certrotate"]:
+        elif args.command in ["monitor", "groupsync", "report", "certrotate", "revoke"]:
             try:
                 cert_auth = True if not args.userauth else False
             except AttributeError:
@@ -189,6 +195,12 @@ def main():
                     )
                 elif args.filename:
                     runner.iam.sync_group_json(filename=args.filename)
+
+            elif args.command == "revoke":
+                if args.upn:
+                    runner.iam.revoke_session(userid=args.upn)
+                elif args.filename:
+                    runner.iam.revoke_sessions_blk(filename=args.filename)
 
             elif args.command == "report":
                 runner.iam.report_license_activation(outdir=args.dirpath)
