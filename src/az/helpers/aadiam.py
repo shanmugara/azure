@@ -491,6 +491,7 @@ class Aadiam(AzureAd):
 
 
         try:
+            logad.info(f'Fetching file from git url: {base_url} repo: {repo}, filepath: {filepath}')
             git_file = com_utils.github_get_file(base_url=base_url, repo=repo, path=filepath, git_token=token, branch=branch)
             if git_file:
                 logad.info('processing groups from sync file (git repo)..')
