@@ -151,7 +151,7 @@ def main():
     git_sync = subparser.add_parser(name="groupsyncgit", help="Groupsync with json file from git repo")
     git_sync.add_argument("-r", "--repo", help="git repo name", type=str, required=True)
     git_sync.add_argument("-o", "--token", help="Git API access toekn", type=str, required=True)
-    git_sync.add_argument("-u", "--giturl", help="Git API URL", default="https://api.github.com")
+    git_sync.add_argument("-u", "--giturl", help="Git API URL", default="")
     git_sync.add_argument("-f", "--filepath", help="Relative path of the groups json file", required=True, type=str)
     git_sync.add_argument("-t", "--testmode", dest="testmode", help="Run in test mode, no writes", action="store_true")
 
