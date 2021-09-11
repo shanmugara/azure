@@ -14,7 +14,7 @@ setup(name='azuregraph',
       license='GPL',
       install_requires=req_lst,
       package_dir={"": "src"},
-      packages=['az','az.rest', 'az.helpers'],
+      packages=['az', 'az.helpers'],
       entry_points={
           'console_scripts':
               ['callgraph = az.runner:main'],
