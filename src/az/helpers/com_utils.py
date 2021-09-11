@@ -51,6 +51,8 @@ def github_get_file(base_url, repo, path, git_token, branch="main"):
         else:
             git_url = f'{base_url}/api/v3'
 
+        utillog.info(f'Using git api url {git_url}')
+
         g = Github(base_url=git_url, login_or_token=git_token)
         repo = g.get_repo(repo)
         content_encoded = repo.get_contents(urllib.parse.quote(path), ref=branch).content

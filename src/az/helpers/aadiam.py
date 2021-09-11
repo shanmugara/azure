@@ -484,9 +484,9 @@ class Aadiam(AzureAd):
         else:
             try:
                 base_url = config['github']
-                logad.info(f'Git base url: {base_url}')
+                logad.info(f'Git base url in config: {base_url}')
             except:
-                logad.info(f'No git url was specified. Defaulting to https://api.github.com')
+                logad.info('No git url was specified. Defaulting to https://api.github.com')
                 base_url = 'https://api.github.com'
 
 
