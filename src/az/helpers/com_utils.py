@@ -9,13 +9,13 @@ import io
 
 from az.helpers import my_logger
 
-
 if platform.system().lower() == 'windows':
     LOG_DIR = os.path.join('c:\\', 'logs', 'azgraph')
 else:
     LOG_DIR = os.path.join(os.environ['VIRTUAL_ENV'], 'logs', 'azgraph')
 
 utillog = my_logger.My_logger(logdir=LOG_DIR, logfile='com_utils')
+
 
 def write_out_file(outdir, filename, outlines):
     """
@@ -43,9 +43,14 @@ def write_out_file(outdir, filename, outlines):
     else:
         utillog.error('Unable to find target dir "{}"'.format(outdir))
 
+
 def github_get_file(base_url, repo, path, git_token, branch="main"):
     try:
-        git_url = f'{base_url}/api/v3'
+        if any([not base_url, base_url == 'https://api.github.com']):
+            git_url = 'https://api.github.com'
+        else:
+            git_url = f'{base_url}/api/v3'
+
         g = Github(base_url=git_url, login_or_token=git_token)
         repo = g.get_repo(repo)
         content_encoded = repo.get_contents(urllib.parse.quote(path), ref=branch).content
