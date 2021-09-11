@@ -15,6 +15,7 @@ from az.helpers import my_logger
 from az.helpers.config import config
 from az.helpers import powershell
 from az.helpers.azureauth import AzureAd
+from az.helpers import com_utils
 
 if platform.system().lower() == 'windows':
     LOG_DIR = os.path.join('c:\\', 'logs', 'azgraph')
@@ -24,10 +25,12 @@ else:
 logad = my_logger.My_logger(logdir=LOG_DIR, logfile='azureiam')
 loglic = my_logger.My_logger(logdir=LOG_DIR, logfile='licence')
 
+
 class Aadiam(AzureAd):
     """
     Azure AD User and Groups management methods
     """
+
     def __init__(self, cert_auth=True, auto_rotate=False, days=30):
         super(Aadiam, self).__init__(cert_auth=cert_auth, auto_rotate=auto_rotate, days=days)
 
@@ -46,6 +49,7 @@ class Aadiam(AzureAd):
         Generic timer
         :return: wrapped func
         """
+
         @staticmethod
         def add_timer(func):
             functools.wraps(func)
@@ -61,8 +65,8 @@ class Aadiam(AzureAd):
                     )
                 )
                 return func_results
-            return timed_func
 
+            return timed_func
 
     def get_aad_user(self, displayname=None, loginid=None, onprem=False):
         """
@@ -830,27 +834,60 @@ class Aadiam(AzureAd):
             for l in raw_l:
                 file_out_lines.append('{}\n'.format(l))
 
-            epoch_now = str(int((datetime.now()).timestamp()))
+            # epoch_now = str(int((datetime.now()).timestamp()))
             fname_csv = 'licact_report.csv'
 
-            if os.path.isdir(outdir):
-                outfile_csv = os.path.join(outdir, fname_csv)
+            com_utils.write_out_file(outdir=outdir, filename=fname_csv, outlines=file_out_lines)
 
-                if os.path.isfile(outfile_csv):
-                    ren_file_name = os.path.join(outdir, 'licact_report_{}.csv'.format(epoch_now))
-                    logad.info('Renaming old file to {}'.format(ren_file_name))
-                    os.rename(outfile_csv, ren_file_name)
+            # if os.path.isdir(outdir):
+            #     outfile_csv = os.path.join(outdir, fname_csv)
+            #
+            #     if os.path.isfile(outfile_csv):
+            #         ren_file_name = os.path.join(outdir, 'licact_report_{}.csv'.format(epoch_now))
+            #         logad.info('Renaming old file to {}'.format(ren_file_name))
+            #         os.rename(outfile_csv, ren_file_name)
+            #
+            #     with open(outfile_csv, 'w') as f:
+            #         logad.info('Writing report file {}'.format(outfile_csv))
+            #         f.writelines(file_out_lines)
+            # else:
+            #     logad.error('Destination path "{}" doesnt exist or unreachable'.format(outdir))
+            #
+            #     # outfile_json = os.path.join(outdir, fname_json)
+            #     # with open(outfile_json, 'w') as j:
+            #     #     json.dump(raw_dict, j)
+            # return raw_dict
 
-                with open(outfile_csv, 'w') as f:
-                    logad.info('Writing report file {}'.format(outfile_csv))
-                    f.writelines(file_out_lines)
-            else:
-                logad.error('Destination path "{}" doesnt exist or unreachable'.format(outdir))
+        except Exception as e:
+            logad.error('Exception while making REST call - {}'.format(e))
+            return False
 
-                # outfile_json = os.path.join(outdir, fname_json)
-                # with open(outfile_json, 'w') as j:
-                #     json.dump(raw_dict, j)
-            return raw_dict
+    def report_onedrive_usage(self, outdir):
+        """
+        Generate onedrive usage  report
+        outpath: p = "\\\\corp.bloomberg.com\\ny-dfs\\Ops\\InfoSys\\Systems Engineering\\Dropboxes\\O365Activations"
+        :return:
+        """
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
+        _endpoint = config["apiurl"] + "/reports/getOneDriveUsageAccountDetail(period='D7')"
+
+        try:
+            result = self.session.get(url=_endpoint, headers=raw_headers)
+            logad.info('Response reason:{} code:{}'.format(result.reason, result.status_code))
+
+            raw_l = result.text.splitlines()
+            raw_l.pop(0)
+
+            header = "date,site_url,display_name,is_deleted,last_activity,file_count,actice_f_count,used_bytes,alloc_bytes,upn,period"
+
+            out_lines = []
+            out_lines.append(f"{header}\n")
+            for line in raw_l:
+                out_lines.append(f"{line}\n")
+
+            fname = 'odb_usage_report.csv'
+
+            com_utils.write_out_file(outdir=outdir, filename=fname, outlines=out_lines)
 
         except Exception as e:
             logad.error('Exception while making REST call - {}'.format(e))
