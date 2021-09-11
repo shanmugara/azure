@@ -148,11 +148,17 @@ def main():
         type=str,
     )
 
+    git_sync = subparser.add_parser(name="groupsyncgit", help="Groupsync with json file from git repo")
+    git_sync.add_argument("-r", "--repo", help="git repo name", type=str, required=True)
+    git_sync.add_argument("-t", "--token", help="Git API access toekn", type=str, required=True)
+    git_sync.add_argument("-u", "--giturl", help="Git API URL", default="https://api.github.com")
+    git_sync.add_argument("-f", "--filepath", help="Relative path of the groups json file", required=True, type=str)
+    git_sync.add_argument("-t", "--testmode", dest="testmode", help="Run in test mode, no writes", action="store_true")
+
     revoke_session = subparser.add_parser("revoke", help="Revoke user session")
     revoke_args = revoke_session.add_mutually_exclusive_group()
     revoke_args.add_argument("-u", "--upn", help="AAD UPN of the user to revoke session")
     revoke_args.add_argument("-f", "--filename", help="Filename with UPNs in CSV format for bulk operation")
-
 
     args = parser.parse_args()
 
@@ -164,7 +170,7 @@ def main():
             elif args.command == "selfsign":
                 runner.pki.create_self_signed(cn=args.cn, destpath=args.path)
 
-        elif args.command in ["monitor", "groupsync", "report", "certrotate", "revoke"]:
+        elif args.command in ["monitor", "groupsync", "groupsyncgit", "report", "certrotate", "revoke"]:
             try:
                 cert_auth = True if not args.userauth else False
             except AttributeError:
@@ -195,6 +201,10 @@ def main():
                     )
                 elif args.filename:
                     runner.iam.sync_group_json(filename=args.filename)
+
+            elif args.command == "groupsyncgit":
+                runner.iam.sync_group_git(repo=args.repo, filepath=args.filepath, token=args.token, git_url=args.giturl,
+                                          test=args.testmode)
 
             elif args.command == "revoke":
                 if args.upn:
