@@ -149,6 +149,17 @@ def main():
     )
 
     git_sync = subparser.add_parser(name="groupsyncgit", help="Groupsync with json file from git repo")
+    git_sync.add_argument(
+        "--userauth",
+        help="Use username password auth instead of cert auth.",
+        action="store_true",
+    )
+    git_sync.add_argument(
+        "--certrotate",
+        help="Automatically rotate auth cert if close to expire.",
+        action="store_true",
+    )
+    git_sync.add_argument("--days", help="Remaining number of days before a cert is rotated", type=int, default=30)
     git_sync.add_argument("-r", "--repo", help="git repo name", type=str, required=True)
     git_sync.add_argument("-o", "--token", help="Git API access toekn", type=str, required=True)
     git_sync.add_argument("-u", "--giturl", help="Git API URL", default="")
