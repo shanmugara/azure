@@ -1,7 +1,7 @@
 from setuptools import setup
 import os
 
-req_lst = ['requests','msal']
+req_lst = ['requests','msal', 'PyGithub']
 if os.name == 'nt':
     req_lst.append('colorama')
 
