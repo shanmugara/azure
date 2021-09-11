@@ -466,25 +466,29 @@ class Aadiam(AzureAd):
     def sync_group_git(self, repo, filepath, token, branch='main', test=False):
         """
         Use a json file as input for calling sync_group. file format is adgroup:cldgroup
-        sample input json file format"
+        sample input json file format. The file is pulled from a git repo."
         --start--
         {
             "myadgroup1": "mycloudgroup1",
             "myadgroup2": "mycloudgroup2"
         }
         --end--
-        :param filename:
+        :param repo: git repo name
+        :param filepath:
+        :param token:
+        :param branch:
         :return:
         """
 
         try:
-            git_file = com_utils.github_get_file(repo=repo, path=filepath, git_token=token, branch=branch)
+            base_url = config['github']
+            git_file = com_utils.github_get_file(base_url=base_url, repo=repo, path=filepath, git_token=token, branch=branch)
             if git_file:
-                logad.info('processing groups from sync file..')
+                logad.info('processing groups from sync file (git repo)..')
                 sync_group_dict = json.loads(git_file.read())
                 for g in sync_group_dict:
                     self.sync_group(adgroup=g, clgroup=sync_group_dict[g], test=test)
-                logad.info('finished processing sync file..')
+                logad.info('finished processing sync file (git repo)..')
 
         except Exception as e:
             logad.error(f'Exception was thrown while getting file from github repo - {e}')

@@ -43,9 +43,10 @@ def write_out_file(outdir, filename, outlines):
     else:
         utillog.error('Unable to find target dir "{}"'.format(outdir))
 
-def github_get_file(repo, path, git_token, branch="main"):
+def github_get_file(base_url, repo, path, git_token, branch="main"):
     try:
-        g = Github(git_token)
+        git_url = f'{base_url}/api/v3'
+        g = Github(base_url=git_url, login_or_token=git_token)
         repo = g.get_repo(repo)
         content_encoded = repo.get_contents(urllib.parse.quote(path), ref=branch).content
         content = base64.b64decode(content_encoded)
