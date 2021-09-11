@@ -484,7 +484,7 @@ class Aadiam(AzureAd):
             logad.info(f'Git base url: {base_url}')
         except:
             logad.info(f'No giturl was specified. Defaulting to https://api.github.com')
-            base_url = ''
+            base_url = 'https://api.github.com'
 
         try:
             git_file = com_utils.github_get_file(base_url=base_url, repo=repo, path=filepath, git_token=token, branch=branch)
