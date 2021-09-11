@@ -463,6 +463,33 @@ class Aadiam(AzureAd):
             logad.error('Invalid file path.. "{}"'.format(filename))
 
     @Timer.add_timer
+    def sync_group_git(self, repo, filepath, token, branch='main', test=False):
+        """
+        Use a json file as input for calling sync_group. file format is adgroup:cldgroup
+        sample input json file format"
+        --start--
+        {
+            "myadgroup1": "mycloudgroup1",
+            "myadgroup2": "mycloudgroup2"
+        }
+        --end--
+        :param filename:
+        :return:
+        """
+
+        try:
+            git_file = com_utils.github_get_file(repo=repo, path=filepath, git_token=token, branch=branch)
+            if git_file:
+                logad.info('processing groups from sync file..')
+                sync_group_dict = json.loads(git_file.read())
+                for g in sync_group_dict:
+                    self.sync_group(adgroup=g, clgroup=sync_group_dict[g], test=test)
+                logad.info('finished processing sync file..')
+
+        except Exception as e:
+            logad.error(f'Exception was thrown while getting file from github repo - {e}')
+
+    @Timer.add_timer
     def sync_group(self, adgroup, clgroup, test=False):
         """
         Get group members from on-prem AD group and add to a AAD cloud group, and remove members not in on-prem AD group
@@ -879,7 +906,7 @@ class Aadiam(AzureAd):
         outpath: p = "\\\\corp.bloomberg.com\\ny-dfs\\Ops\\InfoSys\\Systems Engineering\\Dropboxes\\O365Activations"
         :return:
         """
-       #BETA
+        # BETA
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
         _endpoint = config["apibetaurl"] + "/reports/getM365AppUserDetail(period='D7')/content?$format=text/csv"
 

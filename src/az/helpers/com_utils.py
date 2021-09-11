@@ -43,10 +43,15 @@ def write_out_file(outdir, filename, outlines):
     else:
         utillog.error('Unable to find target dir "{}"'.format(outdir))
 
-def github_get_file(repo, path, git_token, branch="master"):
-    g = Github(git_token)
-    repo = g.get_repo(repo)
-    content_encoded = repo.get_contents(urllib.parse.quote(path), ref=branch).content
-    content = base64.b64decode(content_encoded)
-    f_mem = io.BytesIO(content)
-    return f_mem
+def github_get_file(repo, path, git_token, branch="main"):
+    try:
+        g = Github(git_token)
+        repo = g.get_repo(repo)
+        content_encoded = repo.get_contents(urllib.parse.quote(path), ref=branch).content
+        content = base64.b64decode(content_encoded)
+        content_str = content.decode()
+        f_mem = io.StringIO(content_str)
+        return f_mem
+    except Exception as e:
+        utillog.error(f'Exception was thorwn while connecting to github - {e}')
+        return False
