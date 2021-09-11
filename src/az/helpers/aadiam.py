@@ -834,29 +834,9 @@ class Aadiam(AzureAd):
             for l in raw_l:
                 file_out_lines.append('{}\n'.format(l))
 
-            # epoch_now = str(int((datetime.now()).timestamp()))
             fname_csv = 'licact_report.csv'
 
             com_utils.write_out_file(outdir=outdir, filename=fname_csv, outlines=file_out_lines)
-
-            # if os.path.isdir(outdir):
-            #     outfile_csv = os.path.join(outdir, fname_csv)
-            #
-            #     if os.path.isfile(outfile_csv):
-            #         ren_file_name = os.path.join(outdir, 'licact_report_{}.csv'.format(epoch_now))
-            #         logad.info('Renaming old file to {}'.format(ren_file_name))
-            #         os.rename(outfile_csv, ren_file_name)
-            #
-            #     with open(outfile_csv, 'w') as f:
-            #         logad.info('Writing report file {}'.format(outfile_csv))
-            #         f.writelines(file_out_lines)
-            # else:
-            #     logad.error('Destination path "{}" doesnt exist or unreachable'.format(outdir))
-            #
-            #     # outfile_json = os.path.join(outdir, fname_json)
-            #     # with open(outfile_json, 'w') as j:
-            #     #     json.dump(raw_dict, j)
-            # return raw_dict
 
         except Exception as e:
             logad.error('Exception while making REST call - {}'.format(e))
