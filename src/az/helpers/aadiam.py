@@ -879,17 +879,22 @@ class Aadiam(AzureAd):
         outpath: p = "\\\\corp.bloomberg.com\\ny-dfs\\Ops\\InfoSys\\Systems Engineering\\Dropboxes\\O365Activations"
         :return:
         """
-        beta_url = 'https://graph.microsoft.com/beta' #BETA GRAPH API
+       #BETA
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
-        _endpoint = beta_url + "/reports/getM365AppUserDetail(period='D7')/content?$format=text/csv"
+        _endpoint = config["apibetaurl"] + "/reports/getM365AppUserDetail(period='D7')/content?$format=text/csv"
 
         try:
             result = self.session.get(url=_endpoint, headers=raw_headers)
             logad.info('Response reason:{} code:{}'.format(result.reason, result.status_code))
 
+            raw_l = result.text.splitlines()
+            out_lines = []
+            for line in raw_l:
+                out_lines.append(f'{line}\n')
+
             fname = 'office_usage_report.csv'
 
-            com_utils.write_out_file(outdir=outdir, filename=fname, outlines=result.text.splitlines())
+            com_utils.write_out_file(outdir=outdir, filename=fname, outlines=out_lines)
 
         except Exception as e:
             logad.error('Exception while making REST call - {}'.format(e))
