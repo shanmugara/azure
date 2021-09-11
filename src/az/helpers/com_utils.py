@@ -2,6 +2,10 @@
 import os
 from datetime import datetime
 import platform
+from github import Github
+import base64
+import urllib
+import io
 
 from az.helpers import my_logger
 
@@ -38,3 +42,11 @@ def write_out_file(outdir, filename, outlines):
 
     else:
         utillog.error('Unable to find target dir "{}"'.format(outdir))
+
+def github_get_file(repo, path, git_token, branch="master"):
+    g = Github(git_token)
+    repo = g.get_repo(repo)
+    content_encoded = repo.get_contents(urllib.parse.quote(path), ref=branch).content
+    content = base64.b64decode(content_encoded)
+    f_mem = io.BytesIO(content)
+    return f_mem

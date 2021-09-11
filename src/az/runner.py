@@ -205,6 +205,7 @@ def main():
             elif args.command == "report":
                 runner.iam.report_license_activation(outdir=args.dirpath)
                 runner.iam.report_onedrive_usage(outdir=args.dirpath)
+                runner.iam.report_office_usage(outdir=args.dirpath)
 
             elif args.command == "certrotate":
                 force = True if args.force else False

@@ -873,6 +873,28 @@ class Aadiam(AzureAd):
             logad.error('Exception while making REST call - {}'.format(e))
             return False
 
+    def report_office_usage(self, outdir):
+        """
+        Generate office apps usage  report
+        outpath: p = "\\\\corp.bloomberg.com\\ny-dfs\\Ops\\InfoSys\\Systems Engineering\\Dropboxes\\O365Activations"
+        :return:
+        """
+        beta_url = 'https://graph.microsoft.com/beta' #BETA GRAPH API
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
+        _endpoint = beta_url + "/reports/getM365AppUserDetail(period='D7')/content?$format=text/csv"
+
+        try:
+            result = self.session.get(url=_endpoint, headers=raw_headers)
+            logad.info('Response reason:{} code:{}'.format(result.reason, result.status_code))
+
+            fname = 'office_usage_report.csv'
+
+            com_utils.write_out_file(outdir=outdir, filename=fname, outlines=result.text.splitlines())
+
+        except Exception as e:
+            logad.error('Exception while making REST call - {}'.format(e))
+            return False
+
     def revoke_session(self, userid):
         """
         revoke all sessions for the given user id
