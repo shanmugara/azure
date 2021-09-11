@@ -11,3 +11,4 @@ debian/files
 debian/python*
 **/.DS_Store
 config.py
+/files/
