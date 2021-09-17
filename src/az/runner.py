@@ -7,6 +7,7 @@ sys.path.insert(0, app_root)
 
 from az.helpers import pki_helper
 from az.helpers import aadiam
+from az.helpers import aadcap
 
 
 class Runner(object):
@@ -14,10 +15,12 @@ class Runner(object):
     Main runner class
     """
 
-    def __init__(self, iam=False, sps=False, cert_auth=True, auto_rotate=False, days=30):
+    def __init__(self, iam=False, cap=False, sps=False, cert_auth=True, auto_rotate=False, days=30):
         self.pki = pki_helper.Cert()
         if iam:
             self.iam = aadiam.Aadiam(cert_auth=cert_auth, auto_rotate=auto_rotate, days=days)
+        if cap:
+            self.cap = aadcap.AadCa()
 
 
 def main():
@@ -171,6 +174,17 @@ def main():
     revoke_args.add_argument("-u", "--upn", help="AAD UPN of the user to revoke session")
     revoke_args.add_argument("-f", "--filename", help="Filename with UPNs in CSV format for bulk operation")
 
+    caconf = subparser.add_parser("caconf", help="Conditional Policy Management")
+    caconf.add_argument("--userauth", help="Use username password auth instead of cert auth.", action="store_true")
+    caconf_bak = caconf.add_argument_group(title="Backup options")
+    caconf_bak.add_argument("-b", "--backup", help="Backup all conditional polices", action="store_true")
+    caconf_bak.add_argument("-d", "--dir", help="Directory path for outfiles")
+
+    caconf_rest = caconf.add_argument_group(title="Restore options")
+    caconf_rest.add_argument("-r", "--restore", help="Restore the given config json file", action="store_true")
+    caconf_rest.add_argument("-f", '--filename', help="Full path of the config file to restore")
+
+
     args = parser.parse_args()
 
     if args:
@@ -181,7 +195,7 @@ def main():
             elif args.command == "selfsign":
                 runner.pki.create_self_signed(cn=args.cn, destpath=args.path)
 
-        elif args.command in ["monitor", "groupsync", "groupsyncgit", "report", "certrotate", "revoke"]:
+        elif args.command in ["monitor", "groupsync", "groupsyncgit", "report", "certrotate", "revoke", "caconf"]:
             try:
                 cert_auth = True if not args.userauth else False
             except AttributeError:
@@ -195,7 +209,10 @@ def main():
             except AttributeError:
                 days = 30
 
-            runner = Runner(iam=True, cert_auth=cert_auth, auto_rotate=cert_rotate, days=days)
+            if args.command == "caconf":
+                runner = Runner(cap=True, cert_auth=cert_auth, auto_rotate=cert_rotate, days=days)
+            else:
+                runner = Runner(iam=True, cert_auth=cert_auth, auto_rotate=cert_rotate, days=days)
 
             if args.command == "monitor":
                 runner.iam.lic_mon(
@@ -231,6 +248,14 @@ def main():
             elif args.command == "certrotate":
                 force = True if args.force else False
                 runner.iam.rotate_this_cert(days=days, force=force)
+
+            elif args.command == "caconf":
+                if all([args.backup, args.dir]):
+                    runner.cap.export_all_cap(outdir=args.dir)
+                elif all([args.restore, args.filename]):
+                    runner.cap.import_cap(filename=args.filename)
+
+
     else:
         return False
 

@@ -36,9 +36,15 @@ def write_out_file(outdir, filename, outlines):
             utillog.info('Renaming old file to {}'.format(ren_file_name))
             os.rename(outfile_csv, ren_file_name)
 
-        with open(outfile_csv, 'w') as f:
-            utillog.info('Writing report file {}'.format(outfile_csv))
-            f.writelines(outlines)
+        if isinstance(outlines, list):
+            with open(outfile_csv, 'w') as f:
+                utillog.info('Writing report file {}'.format(outfile_csv))
+                f.writelines(outlines)
+        elif isinstance(outlines, str):
+            with open(outfile_csv, 'w') as f:
+                utillog.info('Writing report file {}'.format(outfile_csv))
+                f.write(outlines)
+
 
     else:
         utillog.error('Unable to find target dir "{}"'.format(outdir))
