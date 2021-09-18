@@ -17,6 +17,7 @@ else:
 
 logcap = my_logger.My_logger(logdir=LOG_DIR, logfile='azureca')
 
+
 class AadCa(AzureAd):
     """
     Module to manage conditional access policies
@@ -40,7 +41,6 @@ class AadCa(AzureAd):
         except Exception as e:
             logcap.error(f'Exception: {e}, while making API call.')
             return False
-
 
     def export_all_cap(self, outdir):
         """
@@ -85,7 +85,7 @@ class AadCa(AzureAd):
 
     def import_cap(self, filename):
         """
-        Import the given conditonal policy JSON file to AAD
+        Import the given conditional policy JSON file to AAD
         :param filename: input file in json format
         :return:
         """
@@ -97,6 +97,9 @@ class AadCa(AzureAd):
             with open(filename) as f:
                 ca_conf_dict = json.load(f)
                 data_json = json.dumps(ca_conf_dict)
+        else:
+            logcap.error(f'Invalid filename/path not found for {filename}')
+            return False
 
         try:
             cap_dict_lst = self.list_all_cap()
@@ -125,7 +128,7 @@ class AadCa(AzureAd):
                 cap_id = None
 
         except Exception as e:
-            logcap.error(f'Exception while parsing config dict to impot - {e}')
+            logcap.error(f'Exception while parsing config dict to import - {e}')
             return False
 
         try:
@@ -152,6 +155,3 @@ class AadCa(AzureAd):
         except Exception as e:
             logcap.error(f'Exception: {e}, while making API call.')
             return False
-
-
-

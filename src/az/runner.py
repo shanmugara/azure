@@ -67,7 +67,7 @@ def main():
     parse_certrotate.add_argument("-f", "--force", help="Force cert rotation regardless of validity",
                                   action="store_true")
 
-    parse_rep = subparser.add_parser("report", help="Activation report")
+    parse_rep = subparser.add_parser("report", help="Office usage report")
     parse_rep.add_argument(
         "-d",
         "--dirpath",
