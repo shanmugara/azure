@@ -1,4 +1,3 @@
-
 import time
 import json
 import os
@@ -463,7 +462,7 @@ class Aadiam(AzureAd):
             logad.error('Invalid file path.. "{}"'.format(filename))
 
     @Timer.add_timer
-    def sync_group_git(self, repo, filepath, token, git_url=None, branch='main', test=False):
+    def sync_group_git(self, repo, filepath, token, git_url=None, branch='master', test=False):
         """
         Use a json file as input for calling sync_group. file format is adgroup:cldgroup
         sample input json file format. The file is pulled from a git repo."
@@ -489,10 +488,10 @@ class Aadiam(AzureAd):
                 logad.info('No git url was specified. Defaulting to https://api.github.com')
                 base_url = 'https://api.github.com'
 
-
         try:
             logad.info(f'Fetching file from git url: {base_url} repo: {repo}, filepath: {filepath}')
-            git_file = com_utils.github_get_file(base_url=base_url, repo=repo, path=filepath, git_token=token, branch=branch)
+            git_file = com_utils.github_get_file(base_url=base_url, repo=repo, path=filepath, git_token=token,
+                                                 branch=branch)
             if git_file:
                 logad.info('processing groups from sync file (git repo)..')
                 sync_group_dict = json.loads(git_file.read())

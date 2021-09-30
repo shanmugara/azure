@@ -4,6 +4,7 @@ setup.py
 src/az/__init__.py
 src/az/runner.py
 src/az/helpers/__init__.py
+src/az/helpers/aadcap.py
 src/az/helpers/aadiam.py
 src/az/helpers/admodule.ps1
 src/az/helpers/azureauth.py
@@ -14,6 +15,7 @@ src/az/helpers/pki_helper.py
 src/az/helpers/powershell.py
 src/az/helpers/sharepoint.py
 src/az/helpers/__pycache__/__init__.cpython-37.pyc
+src/az/helpers/__pycache__/aadcap.cpython-37.pyc
 src/az/helpers/__pycache__/aadiam.cpython-37.pyc
 src/az/helpers/__pycache__/azureauth.cpython-37.pyc
 src/az/helpers/__pycache__/com_utils.cpython-37.pyc

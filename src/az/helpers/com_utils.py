@@ -50,7 +50,7 @@ def write_out_file(outdir, filename, outlines):
         utillog.error('Unable to find target dir "{}"'.format(outdir))
 
 
-def github_get_file(base_url, repo, path, git_token, branch="main"):
+def github_get_file(base_url, repo, path, git_token, branch="master"):
     try:
         if any([not base_url, base_url == 'https://api.github.com']):
             git_url = 'https://api.github.com'
