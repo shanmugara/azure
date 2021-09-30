@@ -174,11 +174,12 @@ class AzureAd(object):
             log.error('Missing cert/cert_key files. Unable to generate cert creds..')
             return False
 
-    def app_add_cert(self, certfile, keyfile, appid=None):
+    def app_add_cert(self, certfile, keyfile, objectid=None):
         """
         Add a new cert to the application in AAD
         :param certfile: new cert file path
         :param keyfile: new keyfile path
+        :param objectid: Object Id of the application registration
         :return:
         """
 
@@ -191,14 +192,18 @@ class AzureAd(object):
             log.error('Unable to find either certfile or keyfile path. Exiting')
             return False
 
-        if not appid:
-            app_obj = self.get_app(clientid=config['client_id'])
-            app_id = app_obj['id']
+        if not objectid:
+            if config.get('object_id'):
+                # app_obj = self.get_app(objectid=config['client_id'])
+                app_id = config['object_id']
+            else:
+                log.error('Unable to find object_id in config.py. Exiting app_add_cert')
+                return False
         else:
-            app_id = appid
+            app_id = objectid
 
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
-        _endpoint = config["apiurl"] + '/applications/{}/addKey'.format(app_id)
+        _endpoint = config["apiurl"] + f'/applications/{app_id}/addKey'
 
         data_json = json.dumps(data_dict)
 
@@ -214,20 +219,24 @@ class AzureAd(object):
             log.error('Exception {} while adding cert to app "{}"'.format(e, config['client_id']))
             return False
 
-    def app_remove_cert(self, certid, appid=None):
+    def app_remove_cert(self, certid, objectid=None):
         """
         Remove a given cert from the app
         :param certid: id of the cert to remove
         :return:
         """
-        if not appid:
-            app_obj = self.get_app(clientid=config['client_id'])
-            app_id = app_obj['id']
+        if not objectid:
+            if config.get('object_id'):
+                # app_obj = self.get_app(objectid=config['client_id'])
+                app_id = config['object_id']
+            else:
+                log.error('Unable to find object_id in config.py. Exiting app_add_cert')
+                return False
         else:
-            app_id = appid
+            app_id = objectid
 
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
-        _endpoint = config["apiurl"] + '/applications/{}/removeKey'.format(app_id)
+        _endpoint = config["apiurl"] + f'/applications/{app_id}/removeKey'
 
         jwt = pki.get_jwt(keyfile=cert['cert_key_path'])
 
@@ -250,26 +259,28 @@ class AzureAd(object):
             log.error('Exception {} while deleting cert id "{}"'.format(e, certid))
             return False
 
-    def get_app(self, clientid):
+    def get_app(self, objectid):
         """
         Get the AAD application reg object
-        :param app_id:
+        :param objectid: Object OF of the application registration
         :return:
         """
 
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
-        _endpoint = config["apiurl"] + '/applications'
+        _endpoint = config["apiurl"] + f'/applications/{objectid}'
 
         try:
             result = self.session.get(url=_endpoint, headers=raw_headers)
-            if int(result.status_code) == 200:
-                apps = result.json()
-                for app in apps['value']:
-                    if app['appId'] == clientid:
-                        return app
 
-                log.error('Unable to find app reg matching clientid {}'.format(clientid))
-                return False
+            if int(result.status_code) == 200:
+                app = result.json()
+                return app
+                # for app in apps['value']:
+                #     if app['appId'] == objectid:
+                #         return app
+
+                # log.error('Unable to find app reg matching clientid {}'.format(objectid))
+                # return False
 
             else:
                 log.error('Get apps result: {}'.format(result.status_code))
@@ -289,7 +300,11 @@ class AzureAd(object):
         this_cert_thumbprint = pki.cert_thumbprint(cert['cert_path']).upper()
 
         # Get the app object
-        this_app = self.get_app(config['client_id'])
+        if config.get('object_id'):
+            this_app = self.get_app(config['object_id'])
+        else:
+            log.error("Did not find an object_id for the application in config.py. Won't rotate cert.")
+            return False
 
         # Get the expiry for this cert
         this_cert = {}
@@ -331,9 +346,9 @@ class AzureAd(object):
 
         # Add new cert to app
         log.info('Adding the new cert to app client_id:{}'.format(config['client_id']))
-        resp = self.app_add_cert(certfile=new_cert_path, keyfile=new_key_path, appid=this_app['id'])
+        resp = self.app_add_cert(certfile=new_cert_path, keyfile=new_key_path, objectid=this_app['id'])
         if not resp:
-            log.error('Failed to add the new cert to app clinet_id:{}. exiting..'.format(config['client_id']))
+            log.error('Failed to add the new cert to app client_id:{}. exiting..'.format(config['client_id']))
             return
 
         # Rename cert files
@@ -354,7 +369,7 @@ class AzureAd(object):
 
         # remove old cert from app
         log.info('Removing old cert keyid {} from app client_id:{}'.format(this_cert['keyId'], config['client_id']))
-        resp = self.app_remove_cert(certid=this_cert['keyId'], appid=this_app['id'])
+        resp = self.app_remove_cert(certid=this_cert['keyId'], objectid=this_app['id'])
         if not resp:
             log.error('Removing cert failed..')
         elif int(resp.status_code) == 204:

@@ -1,3 +1,4 @@
+
 import time
 import json
 import os
@@ -482,16 +483,16 @@ class Aadiam(AzureAd):
             base_url = git_url
         else:
             try:
-                base_url = config['github']
+                base_url = config['github_url']
                 logad.info(f'Git base url in config: {base_url}')
             except:
                 logad.info('No git url was specified. Defaulting to https://api.github.com')
                 base_url = 'https://api.github.com'
 
+
         try:
             logad.info(f'Fetching file from git url: {base_url} repo: {repo}, filepath: {filepath}')
-            git_file = com_utils.github_get_file(base_url=base_url, repo=repo, path=filepath, git_token=token,
-                                                 branch=branch)
+            git_file = com_utils.github_get_file(base_url=base_url, repo=repo, path=filepath, git_token=token, branch=branch)
             if git_file:
                 logad.info('processing groups from sync file (git repo)..')
                 sync_group_dict = json.loads(git_file.read())

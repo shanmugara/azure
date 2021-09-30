@@ -8,6 +8,7 @@ import urllib
 import io
 
 from az.helpers import my_logger
+from az.helpers.config import config
 
 if platform.system().lower() == 'windows':
     LOG_DIR = os.path.join('c:\\', 'logs', 'azgraph')
@@ -52,14 +53,21 @@ def write_out_file(outdir, filename, outlines):
 
 def github_get_file(base_url, repo, path, git_token, branch="master"):
     try:
-        if any([not base_url, base_url == 'https://api.github.com']):
+        if any([not base_url, base_url == 'https://api.github.com', base_url == 'https://api.github.com/api/v3']):
+            # default
             git_url = 'https://api.github.com'
         else:
+            # https://developer.github.com/v3/
             git_url = f'{base_url}/api/v3'
 
         utillog.info(f'Using git api url {git_url}')
 
-        g = Github(base_url=git_url, login_or_token=git_token)
+        if config.get('gitproxy'):
+            proxies = config['gitproxy']
+        else:
+            proxies = None
+
+        g = Github(base_url=git_url, login_or_token=git_token, proxies=proxies)
         repo = g.get_repo(repo)
         content_encoded = repo.get_contents(urllib.parse.quote(path), ref=branch).content
         content = base64.b64decode(content_encoded)
@@ -67,5 +75,5 @@ def github_get_file(base_url, repo, path, git_token, branch="master"):
         f_mem = io.StringIO(content_str)
         return f_mem
     except Exception as e:
-        utillog.error(f'Exception was thorwn while connecting to github - {e}')
+        utillog.error(f'Exception was thrown while connecting to github - {e}')
         return False
