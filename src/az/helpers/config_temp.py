@@ -39,5 +39,6 @@ config = {
     "apibetaurl": "https://graph.microsoft.com/beta",
     "cert_auth": True,
     "proxy": None,
+    "gitproxy": None,
     "github": "https://github.com"
 }
