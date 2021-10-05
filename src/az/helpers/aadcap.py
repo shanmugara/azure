@@ -32,7 +32,7 @@ class AadCa(AzureAd):
         :return: dict or bool
         """
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
-        _endpoint = config["apiurl"] + "/identity/conditionalAccess/policies"
+        _endpoint = config["apibetaurl"] + "/identity/conditionalAccess/policies"
         try:
             result = self.session.get(url=_endpoint, headers=raw_headers)
             cas_dict = result.json()
@@ -90,7 +90,7 @@ class AadCa(AzureAd):
         :return:
         """
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
-        _endpoint = config["apiurl"] + "/identity/conditionalAccess/policies"
+        _endpoint = config["apibetaurl"] + "/identity/conditionalAccess/policies"
 
         if os.path.isfile(filename):
             logcap.info(f'Reading CA policy config file {filename}')
