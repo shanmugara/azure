@@ -21,6 +21,7 @@ logcap = my_logger.My_logger(logdir=LOG_DIR, logfile='azureca')
 class AadCa(AzureAd):
     """
     Module to manage conditional access policies
+    App permissions: Application.Read.All, Policy.Read.All, Policy.ReadWrite.ConditionalAccess
     """
 
     def __init__(self, cert_auth=True, auto_rotate=False, days=30):

@@ -1,4 +1,4 @@
-recursive-include src/az/rest *
 recursive-include src/az/helpers *
+recursive-include src/az/pygithub_fix *
 recursive-include src/az/*
 exclude src/az/helpers/config.py

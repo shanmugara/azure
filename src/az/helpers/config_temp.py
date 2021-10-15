@@ -30,15 +30,16 @@ user = {
     "client_secret": "",
 }
 
-# THIS DICT APPLIES FOR BOTH USER AUTH AND CERT AUTH. UPDATE CLIENT_ID OF THE APP REG. SET PROXIES. CERT AUTH DEFAULT IS TRUE
+# THIS DICT APPLIES FOR BOTH USER AUTH AND CERT AUTH. UPDATE CLIENT_ID AND OBJECT_ID OF THE APP REG. SET PROXIES. CERT AUTH DEFAULT IS TRUE
 # SET TO FALSE IF YOU WANT TO USE USER AUTH INSTEAD. YOU CAN ALSO OVERRIDE AUTH METHOD USING ARG PASSED TO CALLGRAPH RUNNER.
 config = {
     "authority": "https://login.microsoftonline.com/{}".format(tenancy),
     "client_id": "",
+    "object_id": "",
     "apiurl": "https://graph.microsoft.com/v1.0",
     "apibetaurl": "https://graph.microsoft.com/beta",
     "cert_auth": True,
     "proxy": None,
     "gitproxy": None,
-    "github": "https://github.com"
+    "github_url": ""
 }
