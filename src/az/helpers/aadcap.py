@@ -1,8 +1,6 @@
 import ipaddress
 import json
-import logging
 import os
-import re
 import sys
 import platform
 
@@ -178,7 +176,7 @@ class AadCa(AzureAd):
             if int(result.status_code) == 200:
                 r_json = result.json()
                 if not r_json['value']:
-                    logcap.warning('No named locations were found')
+                    logcap.warning('No matching named locations were found')
                 return r_json
             else:
                 logcap.error(f'APi call to get named locations failed with status code - {result.status_code}')
@@ -228,34 +226,17 @@ class AadCa(AzureAd):
             if not os.path.isfile(filepath):
                 logcap.error(f'File path not found - {filepath}')
                 return False
-            with open(filepath) as f:
-                lines = f.readlines()
-            cidr_ips_lst = []
-            _invalid_ips = False
 
-            for line in lines:
-                if line.startswith('#displayName'):
-                    displayName = line.split(':')[1].strip()
-                elif line.startswith('#id'):
-                    id = line.split(':')[1].strip()
-                elif line.startswith('#isTrusted'):
-                    isTrusted = line.split(':')[1].strip()
-                else:
-                    try:
-                        net_o = ipaddress.ip_network(line.strip())
-                        cidr_ips_lst.append(line.strip())
-                    except ValueError:
-                        logcap.error(f'Line {line.strip()} is not a valid ip cidr. Please fix the error')
-                        _invalid_ips = True
+            id, displayName, isTrusted, _invalid_ips, cidr_ips_lst = self.parse_nl_csv(filepath)
 
             if _invalid_ips:
                 logcap.error('Found invalid cidr notations, wont proceed. Exiting')
                 return False
 
-            if 'id' in locals():
+            if id:
                 logcap.info(f'Found object id {id} in CSV, will use this to update object')
 
-            elif 'displayName' in locals():
+            elif displayName:
                 logcap.info(f'Found object displayName {displayName} in CSV, will obtain object id')
                 nl_obj = self.get_nl(name=displayName)
                 if nl_obj['value']:
@@ -266,10 +247,6 @@ class AadCa(AzureAd):
             else:
                 logcap.error('Unable to find either displayName or id attributed in the CSV. Exiting')
                 return False
-
-            if not 'isTrusted' in locals():
-                logcap.warning('Did not find Trust definition in CSV, defaulting to isTrsuted:False')
-                isTrusted = False
 
             iprange_lst = []
             for cr in cidr_ips_lst:
@@ -305,3 +282,101 @@ class AadCa(AzureAd):
             except Exception as e:
                 logcap.error(f'Updating named location {displayName} failed with exception {e}')
                 return False
+
+    def create_nl(self, filepath):
+        """
+        Create a new named location using the input file
+        :param filepath:
+        :return:
+        """
+        if filepath:
+            if not os.path.isfile(filepath):
+                logcap.error(f'File path not found - {filepath}')
+                return False
+
+            id, displayName, isTrusted, _invalid_ips, cidr_ips_lst = self.parse_nl_csv(filepath)
+
+            if _invalid_ips:
+                logcap.error('Found invalid cidr notations, wont proceed. Exiting')
+                return False
+
+            if displayName:
+                nl_obj = self.get_nl(name=displayName)
+                if nl_obj['value']:
+                    id = nl_obj['value'][0]['id']
+                    logcap.error(f'Found an existing named location {displayName}, {id}. Wont create. Exiting')
+                    return False
+            else:
+                logcap.error('Unable to find displayName attributed in the CSV. Exiting')
+                return False
+
+            iprange_lst = []
+            for cr in cidr_ips_lst:
+                iprange_lst.append(
+                    {
+                        "@odata.type": "#microsoft.graph.iPv4CidrRange",
+                        "cidrAddress": cr
+                    }
+                )
+
+            data_dict = {
+                "@odata.type": "#microsoft.graph.ipNamedLocation",
+                "displayName": displayName,
+                "isTrusted": isTrusted,
+                "ipRanges": iprange_lst,
+            }
+
+            data_json = json.dumps(data_dict)
+
+            raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
+            _endpoint = config["apiurl"] + f"/identity/conditionalAccess/namedLocations"
+
+            logcap.info(f'Creating new named location object {displayName}')
+
+            try:
+                result = self.session.post(url=_endpoint, data=data_json, headers=raw_headers)
+                if int(result.status_code) == 201:
+                    logcap.info(f'Successfully created named location {displayName}')
+                    return result
+                else:
+                    logcap.error(f'Creating named location {displayName} failed with status code {result.status_code}')
+                    return result
+            except Exception as e:
+                logcap.error(f'Creating named location {displayName} failed with exception {e}')
+                return False
+
+
+    @staticmethod
+    def parse_nl_csv(filepath):
+        """
+        Parse the given CSV and validate syntax,and return required attributes to caller
+        :param filepath: file to parse
+        :return: cidr_dict, id, displayName, invalid_ips
+        """
+        id = None
+        displayName = None
+        isTrusted = False
+        _invalid_ips = False
+
+        with open(filepath) as f:
+            lines = f.readlines()
+            cidr_ips_lst = []
+            _invalid_ips = False
+
+            for line in lines:
+                if line.startswith('#displayName'):
+                    displayName = line.split(':')[1].strip()
+                elif line.startswith('#id'):
+                    id = line.split(':')[1].strip()
+                elif line.startswith('#isTrusted'):
+                    isTrusted = line.split(':')[1].strip()
+                else:
+                    try:
+                        net_o = ipaddress.ip_network(line.strip())
+                        cidr_ips_lst.append(line.strip())
+                    except ValueError:
+                        logcap.error(f'Line {line.strip()} is not a valid ip cidr. Please fix the error')
+                        _invalid_ips = True
+
+        return id, displayName, isTrusted, _invalid_ips, cidr_ips_lst
+
