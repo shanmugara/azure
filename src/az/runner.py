@@ -184,6 +184,12 @@ def main():
     caconf_rest.add_argument("-r", "--restore", help="Restore the given config json file", action="store_true")
     caconf_rest.add_argument("-f", '--filename', help="Full path of the config file to restore")
 
+    nlconf = subparser.add_parser("nlconf", help="Named locations management")
+    nlconf.add_argument("-f", "--filename", help="Input CSV file name")
+    nlconf_actions = nlconf.add_mutually_exclusive_group()
+    nlconf_actions.add_argument("-u", "--update", help="Update an existing named location", action="store_true")
+    nlconf_actions.add_argument("-c", "--create", help="Create a new named location", action="store_true")
+
 
     args = parser.parse_args()
 
@@ -195,7 +201,7 @@ def main():
             elif args.command == "selfsign":
                 runner.pki.create_self_signed(cn=args.cn, destpath=args.path)
 
-        elif args.command in ["monitor", "groupsync", "groupsyncgit", "report", "certrotate", "revoke", "caconf"]:
+        elif args.command in ["monitor", "groupsync", "groupsyncgit", "report", "certrotate", "revoke", "caconf", "nlconf"]:
             try:
                 cert_auth = True if not args.userauth else False
             except AttributeError:
@@ -209,7 +215,7 @@ def main():
             except AttributeError:
                 days = 30
 
-            if args.command == "caconf":
+            if args.command in ["caconf", "nlconf"]:
                 runner = Runner(cap=True, cert_auth=cert_auth, auto_rotate=cert_rotate, days=days)
             else:
                 runner = Runner(iam=True, cert_auth=cert_auth, auto_rotate=cert_rotate, days=days)
@@ -255,6 +261,11 @@ def main():
                 elif all([args.restore, args.filename]):
                     runner.cap.import_cap(filename=args.filename)
 
+            elif args.command == "nlconf":
+                if all([args.filename, args.update]):
+                    runner.cap.update_nl(filepath=args.filename)
+                elif all([args.filename, args.create]):
+                    runner.cap.create_nl(filepath=args.filename)
 
     else:
         return False
