@@ -185,10 +185,14 @@ def main():
     caconf_rest.add_argument("-f", '--filename', help="Full path of the config file to restore")
 
     nlconf = subparser.add_parser("nlconf", help="Named locations management")
-    nlconf.add_argument("-f", "--filename", help="Input CSV file name")
+    nlconf_f = nlconf.add_mutually_exclusive_group()
+    nlconf_f.add_argument("-f", "--filename", help="Path of input CSV file name to import")
+    nlconf_f.add_argument("-d", "--dir", help="Directory path for outfiles")
+
     nlconf_actions = nlconf.add_mutually_exclusive_group()
     nlconf_actions.add_argument("-u", "--update", help="Update an existing named location", action="store_true")
     nlconf_actions.add_argument("-c", "--create", help="Create a new named location", action="store_true")
+    nlconf_actions.add_argument("-b", "--backup", help="Create a backup of all named locations as CSV", action="store_true")
 
 
     args = parser.parse_args()
@@ -266,7 +270,8 @@ def main():
                     runner.cap.update_nl(filepath=args.filename)
                 elif all([args.filename, args.create]):
                     runner.cap.create_nl(filepath=args.filename)
-
+                elif all([args.dir, args.backup]):
+                    runner.cap.export_nl(outdir=args.dir)
     else:
         return False
 
