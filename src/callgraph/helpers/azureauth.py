@@ -18,9 +18,9 @@ from cryptography.hazmat.primitives import hashes
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from az.helpers import my_logger
-from az.helpers import pki_helper
-from az.helpers.config import config, cert, user, tenancy
+from callgraph.helpers import my_logger
+from callgraph.helpers import pki_helper
+from callgraph.helpers.config import config, cert, user, tenancy
 
 if platform.system().lower() == 'windows':
     LOG_DIR = os.path.join('c:\\', 'logs', 'azgraph')

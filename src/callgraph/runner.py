@@ -5,9 +5,9 @@ import os
 app_root = os.path.split(os.path.abspath(__file__))[0]
 sys.path.insert(0, app_root)
 
-from az.helpers import pki_helper
-from az.helpers import aadiam
-from az.helpers import aadcap
+from callgraph.helpers import pki_helper
+from callgraph.helpers import aadiam
+from callgraph.helpers import aadcap
 
 
 class Runner(object):

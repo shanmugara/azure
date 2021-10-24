@@ -6,7 +6,7 @@ import platform
 
 app_root = os.path.split(os.path.abspath(__file__))[0]
 
-from az.helpers import my_logger
+from callgraph.helpers import my_logger
 
 if platform.system().lower() == 'windows':
     LOG_DIR = os.path.join('c:\\', 'logs', 'azgraph')

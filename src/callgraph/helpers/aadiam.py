@@ -11,11 +11,11 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from az.helpers import my_logger
-from az.helpers.config import config
-from az.helpers import powershell
-from az.helpers.azureauth import AzureAd
-from az.helpers import com_utils
+from callgraph.helpers import my_logger
+from callgraph.helpers.config import config
+from callgraph.helpers import powershell
+from callgraph.helpers.azureauth import AzureAd
+from callgraph.helpers import com_utils
 
 if platform.system().lower() == 'windows':
     LOG_DIR = os.path.join('c:\\', 'logs', 'azgraph')

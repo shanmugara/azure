@@ -26,10 +26,10 @@ import jwt
 import datetime
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-from az.helpers import my_logger
+from callgraph.helpers import my_logger
 
 try:
-    from az.helpers.config import config, cert
+    from callgraph.helpers.config import config, cert
 except Exception as e:
     pass
 

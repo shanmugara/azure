@@ -7,8 +7,8 @@ import base64
 import urllib
 import io
 
-from az.helpers import my_logger
-from az.helpers.config import config
+from callgraph.helpers import my_logger
+from callgraph.helpers.config import config
 
 if platform.system().lower() == 'windows':
     LOG_DIR = os.path.join('c:\\', 'logs', 'azgraph')

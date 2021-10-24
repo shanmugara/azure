@@ -13,4 +13,7 @@ debian/python*
 config.py
 /files/
 /venv39/
-/src/az/helpers/config-prod.py
+/src/callgraph/helpers/config-prod.py
+/src/azuregraph.egg-info/
+/src/callgraph.egg-info/
+/azuregraph.egg-info/
