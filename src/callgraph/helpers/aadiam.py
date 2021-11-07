@@ -235,9 +235,14 @@ class Aadiam(AzureAd):
 
             return ret_dict
 
-        else:
-            logad.error('Did not get a Azure AD group object for "{}"'.format(groupname))
+        elif not group_obj:
+            logad.error('Did not get Azure AD group. API call failed with exception')
             return False
+
+        elif not group_obj['value']:
+            logad.error(f'Did not get an Azure AD group object "{groupname}"')
+            return "noobj"
+
 
     @Timer.add_timer
     def aad_user_upn_map(self, onprem=True):
@@ -530,7 +535,10 @@ class Aadiam(AzureAd):
         self.cldgroup_members_full = self.get_aad_members(groupname=clgroup)
 
         if self.cldgroup_members_full == False:
-            logad.error('Unable to get Azure AD goup "{}". Check group name. Exiting.'.format(clgroup))
+            logad.error(f'Unable to get Azure AD goup "{clgroup}". API call failed. Exiting.')
+            return False
+        elif self.cldgroup_members_full == 'noobj':
+            logad.error(f'Unable to find group object "{clgroup}" in Azure AD')
             return False
 
         if len(self.cldgroup_members_full['value']) == 0:

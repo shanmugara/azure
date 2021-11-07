@@ -3,11 +3,12 @@ import json
 import os
 import sys
 import platform
+import re
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from callgraph.helpers import my_logger
-from callgraph.helpers.config import config
+from callgraph.helpers.config import config, tenancy
 from callgraph.helpers.azureauth import AzureAd
 from callgraph.helpers import com_utils
 
@@ -67,14 +68,16 @@ class AadCa(AzureAd):
                 ca_export_dict[ca['id']]['sessionControls'] = ca['sessionControls']
 
             if os.path.isdir(outdir):
+                tenancy_short = tenancy.split('.')[0]
                 for ca_conf in ca_export_dict.keys():
-                    exp_fname = f'{ca_conf}.json'
+                    displayname_str = re.sub("[^0-9a-zA-Z]+", "_", ca_export_dict[ca_conf]['displayName'])
+                    exp_fname = f"{tenancy_short}_{displayname_str}.json"
                     exp_json = json.dumps(ca_export_dict[ca_conf], indent=4)
                     logcap.info(f'Writing config export for CA policy id {ca_conf}')
                     com_utils.write_out_file(outdir=outdir, filename=exp_fname, outlines=exp_json)
 
                 cas_j_pretty = json.dumps(cas_dict, indent=4)
-                full_dump_fname = "all_ca_config.json"
+                full_dump_fname = f"{tenancy_short}_all_ca_config.json"
                 logcap.info(f'Writing CA policies to file {full_dump_fname}')
 
                 com_utils.write_out_file(outdir=outdir, filename=full_dump_fname, outlines=cas_j_pretty)
@@ -197,6 +200,7 @@ class AadCa(AzureAd):
             if all([nl_dict, nl_dict['value']]):
                 for nl in nl_dict['value']:
                     cidr_lst = []
+                    cidr_lst.append(f"#nltenancy:{tenancy}\n")
                     cidr_lst.append(f"#id:{nl['id']}\n")
                     cidr_lst.append(f"#displayName:{nl['displayName']}\n")
                     cidr_lst.append(f"#isTrusted:{nl['isTrusted']}\n")
@@ -204,8 +208,8 @@ class AadCa(AzureAd):
                     for cidr in nl['ipRanges']:
                         cidr_lst.append(cidr['cidrAddress'] + '\n')
                     # write export csv
-                    com_utils.write_out_file(outdir=outdir, filename=f"nl_{nl['displayName'].lower()}.csv",
-                                             outlines=cidr_lst)
+                    fn = f"{tenancy.split('.')[0]}_nl_{nl['displayName']}.csv".lower()
+                    com_utils.write_out_file(outdir=outdir, filename=fn, outlines=cidr_lst)
 
         except Exception as e:
             logcap.error(f'Getting named locations failed with exception - {e}')
@@ -227,10 +231,14 @@ class AadCa(AzureAd):
                 logcap.error(f'File path not found - {filepath}')
                 return False
 
-            id, displayName, isTrusted, _invalid_ips, cidr_ips_lst = self.parse_nl_csv(filepath)
+            id, displayName, isTrusted, _invalid_ips, cidr_ips_lst, nl_tenancy = self.parse_nl_csv(filepath)
 
             if _invalid_ips:
                 logcap.error('Found invalid cidr notations, wont proceed. Exiting')
+                return False
+
+            if nl_tenancy != tenancy:
+                logcap.error(f'Tenancy name mismatch between csv and config.py. wont proceed.')
                 return False
 
             if id:
@@ -294,10 +302,14 @@ class AadCa(AzureAd):
                 logcap.error(f'File path not found - {filepath}')
                 return False
 
-            id, displayName, isTrusted, _invalid_ips, cidr_ips_lst = self.parse_nl_csv(filepath)
+            id, displayName, isTrusted, _invalid_ips, cidr_ips_lst, nl_tenancy = self.parse_nl_csv(filepath)
 
             if _invalid_ips:
                 logcap.error('Found invalid cidr notations, wont proceed. Exiting')
+                return False
+
+            if nl_tenancy != tenancy:
+                logcap.error(f'Tenancy name mismatch between csv and config.py. wont proceed.')
                 return False
 
             if displayName:
@@ -357,6 +369,7 @@ class AadCa(AzureAd):
         displayName = None
         isTrusted = False
         _invalid_ips = False
+        nl_tenancy = None
 
         with open(filepath) as f:
             lines = f.readlines()
@@ -370,6 +383,10 @@ class AadCa(AzureAd):
                     id = line.split(':')[1].strip()
                 elif line.startswith('#isTrusted'):
                     isTrusted = line.split(':')[1].strip()
+                elif line.startswith('#nltenancy:'):
+                    nl_tenancy = line.split(':')[1].strip()
+                elif line.startswith('#'):
+                    pass #commented line
                 else:
                     try:
                         net_o = ipaddress.ip_network(line.strip())
@@ -378,5 +395,5 @@ class AadCa(AzureAd):
                         logcap.error(f'Line {line.strip()} is not a valid ip cidr. Please fix the error')
                         _invalid_ips = True
 
-        return id, displayName, isTrusted, _invalid_ips, cidr_ips_lst
+        return id, displayName, isTrusted, _invalid_ips, cidr_ips_lst, nl_tenancy
 
