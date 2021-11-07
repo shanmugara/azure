@@ -543,6 +543,9 @@ class Aadiam(AzureAd):
             if create:
                 logad.warning('A group object can be created if chosen.')
                 return False
+            else:
+                logad.error('Auto target group creation is "False". Exiting')
+                return False
 
         if len(self.cldgroup_members_full['value']) == 0:
             is_cldgroup_null = True
@@ -613,6 +616,30 @@ class Aadiam(AzureAd):
 
         else:
             logad.info('No members need to be removed from cloud group "{}"'.format(clgroup))
+
+    def create_target_group(self, groupname):
+        """
+        This method will auto create teh target cloud group during sync, if the target group is missing in Azure AD.
+        The created group will be a role enabled security group
+        :param groupname: group name to create in Azure AD
+        :return:
+        """
+        logad.info(f'Creating target group "{groupname}"')
+        result = self.create_aad_group(groupname=groupname, role_enable=True)
+        if int(result.status_code) == 201:
+            count = 4
+            while count > 0:
+                logad.info('Waiting for Azure AD convergance')
+                time.sleep(15)
+                mems = self.get_aad_members(groupname=groupname)
+                if any([mems == 'noobj', mems == False]):
+                    count -= 1
+                    continue
+                else:
+                    return mems
+            logad.error('Unable to get new group object after 60 seconds. Exiting..')
+            return False
+
 
     def add_member(self, userid, gid):
         """
