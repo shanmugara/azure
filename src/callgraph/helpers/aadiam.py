@@ -509,7 +509,7 @@ class Aadiam(AzureAd):
             logad.error(f'Exception was thrown while getting file from github repo - {e}')
 
     @Timer.add_timer
-    def sync_group(self, adgroup, clgroup, test=False):
+    def sync_group(self, adgroup, clgroup, test=False, create=False):
         """
         Get group members from on-prem AD group and add to a AAD cloud group, and remove members not in on-prem AD group
         from cloud group. AD group is retrieved from on-prem ad. requires quest powershell module for ad. On-prem AD group

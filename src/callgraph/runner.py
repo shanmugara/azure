@@ -132,6 +132,9 @@ def main():
     group_sync.add_argument(
         "-c", "--cloudgroup", help="Cloud group name", required=False, type=str
     )
+
+    group_sync.add_argument("-g", "--groupcreate", help="Create the target role enabled group in Azure AD if group "
+                                                        "doesnt exist", action="store_true")
     group_sync.add_argument(
         "-t",
         "--testmode",
@@ -236,6 +239,7 @@ def main():
                         adgroup=args.adgroup,
                         clgroup=args.cloudgroup,
                         test=args.testmode,
+                        create=args.groupcreate,
                     )
                 elif args.filename:
                     runner.iam.sync_group_json(filename=args.filename)
