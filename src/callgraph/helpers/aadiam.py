@@ -438,7 +438,7 @@ class Aadiam(AzureAd):
             return False
 
     @Timer.add_timer
-    def sync_group_json(self, filename, test=False):
+    def sync_group_json(self, filename, test=False, create=False):
         """
         Use a json file as input for calling sync_group. file format is adgroup:cldgroup
         sample input json file format"
@@ -449,6 +449,7 @@ class Aadiam(AzureAd):
         }
         --end--
         :param filename:
+        :param create: Create target group if missing in Azure AD
         :return:
         """
         if os.path.isfile(filename):
@@ -458,7 +459,7 @@ class Aadiam(AzureAd):
                     syn_group_dict = json.load(f)
                     logad.info('processing groups from sync file..')
                     for g in syn_group_dict:
-                        self.sync_group(adgroup=g, clgroup=syn_group_dict[g], test=test)
+                        self.sync_group(adgroup=g, clgroup=syn_group_dict[g], test=test, create=create)
                     logad.info('finished processing sync file..')
 
             except Exception as e:

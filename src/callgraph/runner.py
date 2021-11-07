@@ -235,7 +235,6 @@ def main():
                 )
             elif args.command == "groupsync":
                 if all([args.adgroup, args.cloudgroup]):
-                    print(f"create arg = {args.groupcreate}")
                     runner.iam.sync_group(
                         adgroup=args.adgroup,
                         clgroup=args.cloudgroup,
@@ -243,7 +242,7 @@ def main():
                         create=args.groupcreate,
                     )
                 elif args.filename:
-                    runner.iam.sync_group_json(filename=args.filename)
+                    runner.iam.sync_group_json(filename=args.filename, create=args.groupcreate,)
 
             elif args.command == "groupsyncgit":
                 runner.iam.sync_group_git(repo=args.repo, filepath=args.filepath, token=args.token, git_url=args.giturl,
