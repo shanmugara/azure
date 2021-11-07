@@ -539,8 +539,9 @@ class Aadiam(AzureAd):
             return False
         elif self.cldgroup_members_full == 'noobj':
             logad.error(f'Unable to find group object "{clgroup}" in Azure AD')
-            logad.warning('A group object can be created if chosen.')
-            return False
+            if create:
+                logad.warning('A group object can be created if chosen.')
+                return False
 
         if len(self.cldgroup_members_full['value']) == 0:
             is_cldgroup_null = True
