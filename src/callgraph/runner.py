@@ -235,7 +235,7 @@ def main():
                 )
             elif args.command == "groupsync":
                 if all([args.adgroup, args.cloudgroup]):
-                    print(args.groupcreate)
+                    print(f"create arg = {args.groupcreate}")
                     runner.iam.sync_group(
                         adgroup=args.adgroup,
                         clgroup=args.cloudgroup,
