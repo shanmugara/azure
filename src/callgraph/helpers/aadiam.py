@@ -324,6 +324,18 @@ class Aadiam(AzureAd):
         }
 
         data_json = json.dumps(data_dict)
+
+        # Check if name is in use. This is to handle a bug in API that creates duplicate groups with same name.
+        try:
+            chk_grp = self.get_aad_group(groupname=groupname)
+            if chk_grp['value']:
+                logad.error(f'Error while creating group. Name "{groupname}" already exists. Exiting..')
+                return False
+
+        except Exception as e:
+            logad.error(f'Exception while checking for group object - {e}. Exiting..')
+            return False
+
         logad.info('Creating group {}'.format(groupname))
         try:
             resp = self.session.post(url=_endpoint, headers=raw_headers, data=data_json)
@@ -541,8 +553,11 @@ class Aadiam(AzureAd):
         elif self.cldgroup_members_full == 'noobj':
             logad.error(f'Unable to find group object "{clgroup}" in Azure AD')
             if create:
-                logad.warning('A group object can be created if chosen.')
-                return False
+                logad.warning(f'Tragte Azure AD group "{clgroup}" doesnt exist. Will create..')
+                result = self.create_target_group(groupname=clgroup)
+                if not result:
+                    logad.error('Creating target group failed. Exiting..')
+                    return False
             else:
                 logad.error('Auto target group creation is "False". Exiting')
                 return False
@@ -626,18 +641,23 @@ class Aadiam(AzureAd):
         """
         logad.info(f'Creating target group "{groupname}"')
         result = self.create_aad_group(groupname=groupname, role_enable=True)
-        if int(result.status_code) == 201:
-            count = 4
-            while count > 0:
-                logad.info('Waiting for Azure AD convergance')
-                time.sleep(15)
-                mems = self.get_aad_members(groupname=groupname)
-                if any([mems == 'noobj', mems == False]):
-                    count -= 1
-                    continue
-                else:
-                    return mems
-            logad.error('Unable to get new group object after 60 seconds. Exiting..')
+        if result:
+            if int(result.status_code) == 201:
+                count = 0
+                while count <= 4:
+                    logad.info('Waiting 15 sec for Azure AD convergance')
+                    time.sleep(15)
+                    mems = self.get_aad_members(groupname=groupname)
+                    if any([mems == 'noobj', mems == False]):
+                        count += 1
+                        continue
+                    else:
+                        self.cldgroup_members_full = mems
+                        return True
+                logad.error('Unable to get new group object after 60 seconds. Exiting..')
+                return False
+        else:
+            logad.error('Error while creating target group. Upstream method call failed.')
             return False
 
 
