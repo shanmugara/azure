@@ -336,7 +336,7 @@ class Aadiam(AzureAd):
             logad.error(f'Exception while checking for group object - {e}. Exiting..')
             return False
 
-        logad.info('Creating group {}'.format(groupname))
+        logad.info('Creating Azure AD group {}'.format(groupname))
         try:
             resp = self.session.post(url=_endpoint, headers=raw_headers, data=data_json)
 
@@ -639,7 +639,6 @@ class Aadiam(AzureAd):
         :param groupname: group name to create in Azure AD
         :return:
         """
-        logad.info(f'Creating target group "{groupname}"')
         result = self.create_aad_group(groupname=groupname, role_enable=True)
         if result:
             if int(result.status_code) == 201:
@@ -653,6 +652,7 @@ class Aadiam(AzureAd):
                         continue
                     else:
                         self.cldgroup_members_full = mems
+                        logad.info(f'Successfully created new role enabled Azure AD security group "{groupname}"')
                         return True
                 logad.error('Unable to get new group object after 60 seconds. Exiting..')
                 return False
