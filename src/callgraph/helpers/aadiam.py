@@ -559,7 +559,7 @@ class Aadiam(AzureAd):
                     logad.error('Creating target group failed. Exiting..')
                     return False
             else:
-                logad.error('Auto target group creation is "False". Exiting')
+                logad.error(f'Auto target group creation is "False". Skipping sync for group "{clgroup}"')
                 return False
 
         if len(self.cldgroup_members_full['value']) == 0:
