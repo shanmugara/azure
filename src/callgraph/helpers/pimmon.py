@@ -19,7 +19,6 @@ class Pimmon(object):
         self.aad = aadiam.Aadiam()
         self.aad.make_aad_roles_map()
 
-
     def make_pim_assignments_dict(self):
         """
         Create dict object with all eligible/active assignments for all AD roles and write a JSON file
@@ -46,7 +45,6 @@ class Pimmon(object):
                 else:
                     self.active_dict[id['roleDefinitionId']].append(id['principalId'])
 
-
     def write_all_assignment_json(self, outdir):
         """
         Create a JSON output of eligible assignments
@@ -64,7 +62,6 @@ class Pimmon(object):
         outlines = json.dumps(self.active_dict, indent=4)
         logpim.info(f'Writing active assignments to file {os.path.join(outdir, out_fname)}')
         com_utils.write_out_file(outdir=outdir, filename=out_fname, outlines=outlines)
-
 
     def compare_eligible(self, inputfile):
         """
@@ -115,14 +112,15 @@ class Pimmon(object):
                     ea_not_in_aad_names = [self.aad_user_map[x] for x in ea_not_in_aad]
 
                     if ea_not_in_ref:
-                        logpim.error(f'PIM delta: The following objects are in role "{role_name}" eligible assignments, '
-                                      f'but not in reference file: {ea_not_in_ref_names}' )
+                        logpim.error(
+                            f'PIM delta: The following objects are in role "{role_name}" eligible assignments, '
+                            f'but not in reference file: {ea_not_in_ref_names}')
                     if ea_not_in_aad:
-                        logpim.error(f'PIM delta: The following objects are not in role "{role_name}" eligible assignments,'
-                                     f'but found in reference file: {ea_not_in_aad_names}')
+                        logpim.error(
+                            f'PIM delta: The following objects are not in role "{role_name}" eligible assignments,'
+                            f'but found in reference file: {ea_not_in_aad_names}')
             except KeyError:
                 logpim.error(f"Role definition '{role_name}' not found in reference file")
-
 
     def compare_active(self, inputfile):
         """
@@ -177,11 +175,11 @@ class Pimmon(object):
                         logpim.error(f'PIM delta: The following objects are in role "{role_name}" active assignments, '
                                      f'but not in reference file: {ea_not_in_ref_names}')
                     if ea_not_in_aad:
-                        logpim.error(f'PIM delta: The following objects are not in role "{role_name}" active assignments,'
-                                     f'but found in reference file: {ea_not_in_aad_names}')
+                        logpim.error(
+                            f'PIM delta: The following objects are not in role "{role_name}" active assignments,'
+                            f'but found in reference file: {ea_not_in_aad_names}')
             except KeyError:
                 logpim.error(f"Role definition '{role_name}' not found in reference file")
-
 
     def make_aad_user_map(self):
         """
@@ -201,7 +199,3 @@ class Pimmon(object):
         except Exception as e:
             logpim.error(f'Unable to get Azure AD user objects - {e}')
             return False
-
-
-
-
