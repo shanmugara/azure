@@ -261,9 +261,9 @@ class Aadiam(AzureAd):
             logad.error('Failed to get users list from AAD')
             return False
 
-    def get_aad_roles(self):
+    def get_aad_roles_templates(self):
         """
-        Get all AAD roles
+        Get all AAD roles templates
         :return:
         """
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token']}
@@ -282,16 +282,82 @@ class Aadiam(AzureAd):
         except Exception as e:
             logad.error('Exception while making API call - {}'.format(e))
 
+    def get_aad_roles_active(self):
+        """
+        Get a list all active Azure Ad roles
+        :return:
+        """
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token']}
+        _endpoint = config["apiurl"] + "/directoryRoles"
+
+        try:
+            result = self.session.get(url=_endpoint, headers=raw_headers)
+            if result.status_code == 200:
+                return result.json()
+            else:
+                logad.error('Error while getting roles')
+                logad.error(f'Status code: {result.status_code}')
+                return False
+
+
+        except Exception as e:
+            logad.error(f'Exception while making API call - {e}')
+
+    def get_pim_eligibility_assignments(self):
+        """
+        Get a list PIM eligibility assignments for AD roles
+        :return:
+        """
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token']}
+        _endpoint = config["apibetaurl"] + "/roleManagement/directory/roleEligibilityScheduleRequests"
+
+        try:
+            result = self.session.get(url=_endpoint, headers=raw_headers)
+            if result.status_code == 200:
+                return result.json()
+            else:
+                logad.error('Error while getting assignments')
+                logad.error(f'Status code: {result.status_code}')
+                return False
+
+
+        except Exception as e:
+            logad.error(f'Exception while making API call - {e}')
+
+    def get_pim_assignment_schedule(self):
+        """
+        Get a list of role assignment schedules for role members
+        :return:
+        """
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token']}
+        _endpoint = config["apibetaurl"] + "/roleManagement/directory/roleAssignmentSchedules"
+
+        try:
+            result = self.session.get(url=_endpoint, headers=raw_headers)
+            if result.status_code == 200:
+                return result.json()
+            else:
+                logad.error('Error while getting assignments')
+                logad.error(f'Status code: {result.status_code}')
+                return False
+
+
+        except Exception as e:
+            logad.error(f'Exception while making API call - {e}')
+
+
     def make_aad_roles_map(self):
         """
         Generate a dict of roles {display name: id}
         :return:
         """
-        roles = self.get_aad_roles()
+        roles = self.get_aad_roles_templates()
         self.aad_roles_map = {}
+        self.aad_roles_map_rev = {}
         if roles['value']:
             for role in roles['value']:
                 self.aad_roles_map[role['displayName'].lower()] = role['id']
+                self.aad_roles_map_rev[role['id']] = role['displayName'].lower()
 
         else:
             logad.error('Unable to get roles from aad. Giving up.')
@@ -553,7 +619,7 @@ class Aadiam(AzureAd):
         elif self.cldgroup_members_full == 'noobj':
             logad.error(f'Unable to find group object "{clgroup}" in Azure AD')
             if create:
-                logad.warning(f'Tragte Azure AD group "{clgroup}" doesnt exist. Will create..')
+                logad.warning(f'Target Azure AD group "{clgroup}" doesnt exist. Will auto create new group.')
                 result = self.create_target_group(groupname=clgroup)
                 if not result:
                     logad.error('Creating target group failed. Exiting..')
