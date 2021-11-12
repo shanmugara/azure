@@ -607,7 +607,7 @@ class Aadiam(AzureAd):
                 logad.info('processing groups from sync file (git repo)..')
                 sync_group_dict = json.loads(git_file.read())
                 for g in sync_group_dict:
-                    self.sync_group(adgroup=g, clgroup=sync_group_dict[g], test=test)
+                    self.sync_group(adgroup=g, clgroup=sync_group_dict[g], test=test, create=create)
                 logad.info('finished processing sync file (git repo)..')
 
         except Exception as e:
