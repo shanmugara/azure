@@ -180,6 +180,8 @@ def main():
     git_sync.add_argument("-u", "--giturl", help="Git API URL", default="")
     git_sync.add_argument("-f", "--filepath", help="Relative path of the groups json file", required=True, type=str)
     git_sync.add_argument("-t", "--testmode", dest="testmode", help="Run in test mode, no writes", action="store_true")
+    git_sync.add_argument("-g", "--groupcreate", help="Create the target role enabled group in Azure AD if group "
+                                                        "doesnt exist", action="store_true")
 
     revoke_session = subparser.add_parser("revoke", help="Revoke user session")
     revoke_args = revoke_session.add_mutually_exclusive_group()
@@ -264,7 +266,7 @@ def main():
 
             elif args.command == "groupsyncgit":
                 runner.iam.sync_group_git(repo=args.repo, filepath=args.filepath, token=args.token, git_url=args.giturl,
-                                          test=args.testmode)
+                                          test=args.testmode, create=args.groupcreate)
 
             elif args.command == "revoke":
                 if args.upn:

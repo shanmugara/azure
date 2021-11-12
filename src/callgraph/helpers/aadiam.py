@@ -573,7 +573,7 @@ class Aadiam(AzureAd):
             logad.error('Invalid file path.. "{}"'.format(filename))
 
     @Timer.add_timer
-    def sync_group_git(self, repo, filepath, token, git_url=None, branch='master', test=False):
+    def sync_group_git(self, repo, filepath, token, git_url=None, branch='master', test=False, create=False):
         """
         Use a json file as input for calling sync_group. file format is adgroup:cldgroup
         sample input json file format. The file is pulled from a git repo."
