@@ -7,7 +7,7 @@ import platform
 import re
 import functools
 import timeit
-from datetime import datetime
+import traceback
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
@@ -309,38 +309,64 @@ class Aadiam(AzureAd):
         :return:
         """
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token']}
-        _endpoint = config["apibetaurl"] + "/roleManagement/directory/roleEligibilityScheduleRequests"
+        _endpoint = config["apibetaurl"] + "/roleManagement/directory/roleEligibilityScheduleInstances"
+
+        page = True
 
         try:
-            result = self.session.get(url=_endpoint, headers=raw_headers)
-            if result.status_code == 200:
-                return result.json()
-            else:
-                logad.error('Error while getting assignments')
-                logad.error(f'Status code: {result.status_code}')
-                return False
+            eligible_assigns = []
+            while page:
+                result = self.session.get(url=_endpoint, headers=raw_headers)
+
+                if result.status_code == 200:
+                    result_json = result.json()
+                    eligible_assigns.extend(result_json['value'])
+                    if '@odata.nextLink' in result_json.keys():
+                        _endpoint = result_json['@odata.nextLink']
+                    else:
+                        page = False
+
+                else:
+                    logad.error('Error while getting assignments')
+                    logad.error(f'Status code: {result.status_code}')
+                    return False
+
+            return eligible_assigns
 
 
         except Exception as e:
             logad.error(f'Exception while making API call - {e}')
+            traceback.print_exc()
 
     def get_pim_assignment_schedule(self):
         """
-        Get a list of role assignment schedules for role members
+        Get a list of role assignment schedules for role members. These are active assignments in PIM role
         :return:
         """
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token']}
         _endpoint = config["apibetaurl"] + "/roleManagement/directory/roleAssignmentSchedules"
 
-        try:
-            result = self.session.get(url=_endpoint, headers=raw_headers)
-            if result.status_code == 200:
-                return result.json()
-            else:
-                logad.error('Error while getting assignments')
-                logad.error(f'Status code: {result.status_code}')
-                return False
+        page = True
 
+        try:
+            active_assigns = []
+            while page:
+                result = self.session.get(url=_endpoint, headers=raw_headers)
+
+                if result.status_code == 200:
+                    result_json = result.json()
+                    active_assigns.extend(result_json['value'])
+                    if '@odata.nextLink' in result_json.keys():
+                        _endpoint = result_json['@odata.nextLink']
+                    else:
+                        page = False
+
+                else:
+                    logad.error('Error while getting assignments')
+                    logad.error(f'Status code: {result.status_code}')
+                    return False
+
+            return active_assigns
 
         except Exception as e:
             logad.error(f'Exception while making API call - {e}')
@@ -598,105 +624,113 @@ class Aadiam(AzureAd):
         :param test: test mode with no writes (bool)
         :return:
         """
+        try:
+            logad.info('Start syncing AD group "{}" to cloud group "{}"'.format(adgroup, clgroup))
+            if not hasattr(self, 'all_aad_grp_ids'):
+                self.make_aad_grp_id_map()
 
-        logad.info('Start syncing AD group "{}" to cloud group "{}"'.format(adgroup, clgroup))
-        if not hasattr(self, 'all_aad_grp_ids'):
-            self.make_aad_grp_id_map()
+            if not hasattr(self, 'upn_id_map'):
+                self.aad_user_upn_map(onprem=True)
 
-        if not hasattr(self, 'upn_id_map'):
-            self.aad_user_upn_map(onprem=True)
-
-        adgroup_members = powershell.get_adgroupmember(groupname=adgroup)
-        if adgroup_members == False:
-            logad.error('Unable to get on-prem AD group members for "{}". Check group name. Exiting.'.format(adgroup))
-            return False
-
-        self.cldgroup_members_full = self.get_aad_members(groupname=clgroup)
-
-        if self.cldgroup_members_full == False:
-            logad.error(f'Unable to get Azure AD goup "{clgroup}". API call failed. Exiting.')
-            return False
-        elif self.cldgroup_members_full == 'noobj':
-            logad.error(f'Unable to find group object "{clgroup}" in Azure AD')
-            if create:
-                logad.warning(f'Target Azure AD group "{clgroup}" doesnt exist. Will auto create new group.')
-                result = self.create_target_group(groupname=clgroup)
-                if not result:
-                    logad.error('Creating target group failed. Exiting..')
-                    return False
-            else:
-                logad.error(f'Auto target group creation is "False". Skipping sync for group "{clgroup}"')
+            adgroup_members = powershell.get_adgroupmember(groupname=adgroup)
+            if adgroup_members == False:
+                logad.error('Unable to get on-prem AD group members for "{}". Check group name. Exiting.'.format(adgroup))
                 return False
 
-        if len(self.cldgroup_members_full['value']) == 0:
-            is_cldgroup_null = True
-        else:
-            is_cldgroup_null = False
+            self.cldgroup_members_full = self.get_aad_members(groupname=clgroup)
 
-        cldgroup_members = []
-
-        if not is_cldgroup_null:
-            for user in self.cldgroup_members_full['value']:
-                cld_upn_short = user['userPrincipalName'].split('@')[0].lower()
-                cldgroup_members.append(cld_upn_short.lower())
-
-        mem_not_in_cld = set(adgroup_members) - set(cldgroup_members)
-        mem_not_in_ad = set(cldgroup_members) - set(adgroup_members)
-
-        logad.info('Members list to be added to cloud group "{}" - {}'.format(clgroup, list(mem_not_in_cld)))
-
-        # add missing members to cld group
-        if mem_not_in_cld:
-            mem_to_add_to_cld = []
-            not_in_aad = []
-
-            for u in list(mem_not_in_cld):
-                try:
-                    mem_to_add_to_cld.append(self.upn_id_map[u.lower()])
-                except KeyError:
-                    not_in_aad.append(u)
-            if not_in_aad:
-                logad.error(
-                    'on-prem AD users {} not found in Azure AD. This may be a transient AAD Sync delay.'
-                    'These users will not be added to group "{}" in this cycle.'.format(not_in_aad, clgroup))
-
-            if mem_to_add_to_cld:
-                logad.info(
-                    'Adding new members {} to cloud group "{}"'.format(
-                        list(set(mem_not_in_cld) - set(list(not_in_aad))),
-                        clgroup))
-                result = self.add_members_blk(uidlist=mem_to_add_to_cld, gid=self.cldgroup_members_full['group_id'],
-                                              test=test)
-                if result:
-                    logad.info('Bulk add result code: OK')
+            if self.cldgroup_members_full == False:
+                logad.error(f'Unable to get Azure AD goup "{clgroup}". API call failed. Exiting.')
+                return False
+            elif self.cldgroup_members_full == 'noobj':
+                logad.error(f'Unable to find group object "{clgroup}" in Azure AD')
+                if create:
+                    logad.warning(f'Target Azure AD group "{clgroup}" doesnt exist. Will auto create new group.')
+                    if not test:
+                        result = self.create_target_group(groupname=clgroup)
+                        if not result:
+                            logad.error('Creating target group failed. Exiting..')
+                            return False
+                    else:
+                        logad.info("Test mode. Group not created..")
+                        return False
                 else:
-                    logad.error('Bulk add result code: FAILED')
-        else:
-            logad.info('No new members to be added to group "{}"'.format(clgroup))
+                    logad.error(f'Auto target group creation is "False". Skipping sync for group "{clgroup}"')
+                    return False
 
-        logad.info('Members list to be removed from cloud group "{}" - {}'.format(clgroup, list(mem_not_in_ad)))
-        if mem_not_in_ad:
-            logad.info('Deleting members {} from cloud group "{}"'.format(list(mem_not_in_ad), clgroup))
-            for s_upn in list(mem_not_in_ad):
-                logad.info('Deleting "{}" from group "{}"'.format(s_upn, clgroup))
+            if len(self.cldgroup_members_full['value']) == 0:
+                is_cldgroup_null = True
+            else:
+                is_cldgroup_null = False
 
-                try:
-                    result = self.remove_member(userid=self.upn_id_map[s_upn],
-                                                gid=self.cldgroup_members_full['group_id'], test=test)
-                    if test:
-                        logad.info('Test mode...')
-                        continue
+            cldgroup_members = []
 
-                    logad.info('Status code: {}'.format(result.status_code))
+            if not is_cldgroup_null:
+                for user in self.cldgroup_members_full['value']:
+                    cld_upn_short = user['userPrincipalName'].split('@')[0].lower()
+                    cldgroup_members.append(cld_upn_short.lower())
 
-                except KeyError:
-                    logad.error('Unable to find adsynced user {} in azure ad'.format(s_upn))
-                except Exception as e:
+            mem_not_in_cld = set(adgroup_members) - set(cldgroup_members)
+            mem_not_in_ad = set(cldgroup_members) - set(adgroup_members)
+
+            logad.info('Members list to be added to cloud group "{}" - {}'.format(clgroup, list(mem_not_in_cld)))
+
+            # add missing members to cld group
+            if mem_not_in_cld:
+                mem_to_add_to_cld = []
+                not_in_aad = []
+
+                for u in list(mem_not_in_cld):
+                    try:
+                        mem_to_add_to_cld.append(self.upn_id_map[u.lower()])
+                    except KeyError:
+                        not_in_aad.append(u)
+                if not_in_aad:
                     logad.error(
-                        'Exception "{}" was thrown while removing id: {} from group: {}'.format(e, s_upn, clgroup))
+                        'on-prem AD users {} not found in Azure AD. This may be a transient AAD Sync delay.'
+                        'These users will not be added to group "{}" in this cycle.'.format(not_in_aad, clgroup))
 
-        else:
-            logad.info('No members need to be removed from cloud group "{}"'.format(clgroup))
+                if mem_to_add_to_cld:
+                    logad.info(
+                        'Adding new members {} to cloud group "{}"'.format(
+                            list(set(mem_not_in_cld) - set(list(not_in_aad))),
+                            clgroup))
+                    result = self.add_members_blk(uidlist=mem_to_add_to_cld, gid=self.cldgroup_members_full['group_id'],
+                                                  test=test)
+                    if result:
+                        logad.info('Bulk add result code: OK')
+                    else:
+                        logad.error('Bulk add result code: FAILED')
+            else:
+                logad.info('No new members to be added to group "{}"'.format(clgroup))
+
+            logad.info('Members list to be removed from cloud group "{}" - {}'.format(clgroup, list(mem_not_in_ad)))
+            if mem_not_in_ad:
+                logad.info('Deleting members {} from cloud group "{}"'.format(list(mem_not_in_ad), clgroup))
+                for s_upn in list(mem_not_in_ad):
+                    logad.info('Deleting "{}" from group "{}"'.format(s_upn, clgroup))
+
+                    try:
+                        result = self.remove_member(userid=self.upn_id_map[s_upn],
+                                                    gid=self.cldgroup_members_full['group_id'], test=test)
+                        if test:
+                            logad.info('Test mode...')
+                            continue
+
+                        logad.info('Status code: {}'.format(result.status_code))
+
+                    except KeyError:
+                        logad.error('Unable to find adsynced user {} in azure ad'.format(s_upn))
+                    except Exception as e:
+                        logad.error(
+                            'Exception "{}" was thrown while removing id: {} from group: {}'.format(e, s_upn, clgroup))
+
+            else:
+                logad.info('No members need to be removed from cloud group "{}"'.format(clgroup))
+        except Exception as e:
+            logad.error(f"Exception while syncing group - {e}")
+            traceback.print_exc()
+            return False
 
     def create_target_group(self, groupname):
         """

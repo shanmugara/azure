@@ -39,11 +39,11 @@ def write_out_file(outdir, filename, outlines):
 
         if isinstance(outlines, list):
             with open(outfile_csv, 'w') as f:
-                utillog.info('Writing report file {}'.format(outfile_csv))
+                utillog.info('Writing file {}'.format(outfile_csv))
                 f.writelines(outlines)
         elif isinstance(outlines, str):
             with open(outfile_csv, 'w') as f:
-                utillog.info('Writing report file {}'.format(outfile_csv))
+                utillog.info('Writing file {}'.format(outfile_csv))
                 f.write(outlines)
 
 

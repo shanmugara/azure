@@ -8,6 +8,7 @@ sys.path.insert(0, app_root)
 from callgraph.helpers import pki_helper
 from callgraph.helpers import aadiam
 from callgraph.helpers import aadcap
+from callgraph.helpers import pimmon
 
 
 class Runner(object):
@@ -15,17 +16,25 @@ class Runner(object):
     Main runner class
     """
 
-    def __init__(self, iam=False, cap=False, sps=False, cert_auth=True, auto_rotate=False, days=30):
+    def __init__(self,
+                 iam=False,
+                 cap=False,
+                 pim=False,
+                 sps=False,
+                 cert_auth=True,
+                 auto_rotate=False,
+                 days=30):
         self.pki = pki_helper.Cert()
         if iam:
             self.iam = aadiam.Aadiam(cert_auth=cert_auth, auto_rotate=auto_rotate, days=days)
         if cap:
             self.cap = aadcap.AadCa()
+        if pim:
+            self.pim = pimmon.Pimmon()
 
 
 def main():
     """
-
     :return:
     """
     sku_list = [
@@ -195,8 +204,14 @@ def main():
     nlconf_actions = nlconf.add_mutually_exclusive_group()
     nlconf_actions.add_argument("-u", "--update", help="Update an existing named location", action="store_true")
     nlconf_actions.add_argument("-c", "--create", help="Create a new named location", action="store_true")
-    nlconf_actions.add_argument("-b", "--backup", help="Create a backup of all named locations as CSV", action="store_true")
+    nlconf_actions.add_argument("-b", "--backup", help="Create a backup of all named locations as CSV",
+                                action="store_true")
 
+    pimmon = subparser.add_parser("pimmon", help="PIM Role change monitoring")
+    pimmon_action = pimmon.add_mutually_exclusive_group()
+    pimmon_action.add_argument("-b", "--backup", help="Create a backup of current PIM roles", action="store_true")
+    pimmon_action.add_argument("-m", "--monitor", help="Run a monitoring cycle for all roles", action="store_true")
+    pimmon.add_argument("-d", "--dir", help="Directory path for reference file", required=False)
 
     args = parser.parse_args()
 
@@ -208,7 +223,8 @@ def main():
             elif args.command == "selfsign":
                 runner.pki.create_self_signed(cn=args.cn, destpath=args.path)
 
-        elif args.command in ["monitor", "groupsync", "groupsyncgit", "report", "certrotate", "revoke", "caconf", "nlconf"]:
+        elif args.command in ["monitor", "groupsync", "groupsyncgit", "report", "certrotate", "revoke",
+                              "caconf", "nlconf", "pimmon"]:
             try:
                 cert_auth = True if not args.userauth else False
             except AttributeError:
@@ -224,6 +240,8 @@ def main():
 
             if args.command in ["caconf", "nlconf"]:
                 runner = Runner(cap=True, cert_auth=cert_auth, auto_rotate=cert_rotate, days=days)
+            elif args.command == "pimmon":
+                runner = Runner(pim=True, cert_auth=cert_auth, auto_rotate=cert_rotate, days=days)
             else:
                 runner = Runner(iam=True, cert_auth=cert_auth, auto_rotate=cert_rotate, days=days)
 
@@ -242,7 +260,7 @@ def main():
                         create=args.groupcreate,
                     )
                 elif args.filename:
-                    runner.iam.sync_group_json(filename=args.filename, create=args.groupcreate,)
+                    runner.iam.sync_group_json(filename=args.filename, create=args.groupcreate, )
 
             elif args.command == "groupsyncgit":
                 runner.iam.sync_group_git(repo=args.repo, filepath=args.filepath, token=args.token, git_url=args.giturl,
@@ -276,6 +294,13 @@ def main():
                     runner.cap.create_nl(filepath=args.filename)
                 elif all([args.dir, args.backup]):
                     runner.cap.export_nl(outdir=args.dir)
+
+            elif args.command == "pimmon":
+                if all([args.backup, args.dir]):
+                    runner.pim.write_all_assignment_json(outdir=args.dir)
+                if all([args.dir, args.monitor]):
+                    runner.pim.compare_eligible(inputdir=args.dir)
+                    runner.pim.compare_active(inputdir=args.dir)
     else:
         return False
 
