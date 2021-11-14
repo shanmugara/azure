@@ -212,9 +212,14 @@ def main():
 
     pimmon = subparser.add_parser("pimmon", help="PIM Role change monitoring")
     pimmon_action = pimmon.add_mutually_exclusive_group()
-    pimmon_action.add_argument("-b", "--backup", help="Create a backup of current PIM roles", action="store_true")
+    pimmon_action.add_argument("-e", "--export", help="Create an export of current PIM roles", action="store_true")
     pimmon_action.add_argument("-m", "--monitor", help="Run a monitoring cycle for all roles", action="store_true")
-    pimmon.add_argument("-d", "--dir", help="Directory path for reference file", required=False)
+    pimmon.add_argument("-d", "--dir", help="Relative directory path for reference file. "
+                                            "Git relative folder path if using git. (monitor|export)", required=False)
+    pimmon.add_argument("-r", "--repo", help="git repo name (monitor)", type=str, required=False)
+    pimmon.add_argument("-o", "--token", help="Git API access toekn (monitor)", type=str, required=False)
+    pimmon.add_argument("-u", "--giturl", help="Git API URL (monitor)", default="", required=False)
+    pimmon.add_argument("-b", "--branch", help="Git branch to use (monitor, default=master)", default="master", required=False)
 
     args = parser.parse_args()
 
@@ -299,7 +304,7 @@ def main():
                     runner.cap.export_nl(outdir=args.dir)
 
             elif args.command == "pimmon":
-                if all([args.backup, args.dir]):
+                if all([args.export, args.dir]):
                     runner.pim.write_all_assignment_json(outdir=args.dir)
                 if all([args.dir, args.monitor]):
                     runner.pim.compare_eligible(inputdir=args.dir)

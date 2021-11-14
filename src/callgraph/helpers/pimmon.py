@@ -111,23 +111,48 @@ class Pimmon(Aadiam):
         logpim.info(f'Writing active assignments to file {os.path.join(outdir, out_fname)}')
         com_utils.write_out_file(outdir=outdir, filename=out_fname, outlines=outlines)
 
-    def compare_eligible(self, inputdir, inputfile=None):
+    def compare_eligible(self, inputdir=None, inputfile=None, giturl=None, gitrepo=None, gittoken=None,
+                         branch="master"):
         """
         Compare the Azure AD eligible role assignments against "inputfile". Report any mismatches as errors
         :param inputfile: Input JSON file of eligible assignments
         :return:
         """
-        if not os.path.isdir(inputdir):
-            logpim.error(f"Path not found = '{inputdir}'")
-            return False
+        logpim.title("Starting PIM Eligible assignments verification")
+        if inputdir:
+            if not os.path.isdir(inputdir):
+                logpim.error(f"Path not found = '{inputdir}'")
+                return False
+            else:
+                if not inputfile:
+                    inputfile = os.path.join(inputdir, f"{tenancy.split('.')[0]}_eligible.json")
+                if os.path.isfile(inputfile):
+                    logpim.info(f'Loading reference assignments from "{inputfile}"')
+                    with open(inputfile) as f:
+                        ref_eligible_dict = json.load(f)
+                else:
+                    logpim.error(f'File not found - "{inputfile}"')
+                    return False
 
-        if not inputfile:
-            inputfile = os.path.join(inputdir, f"{tenancy.split('.')[0]}_eligible.json")
+        elif all([gitrepo, gittoken]):
+            if not inputfile:
+                inputfile = f"{tenancy.split('.')[0]}_eligible.json"
 
-        if os.path.isfile(inputfile):
-            logpim.info(f'Loading reference assignemts from "{inputfile}"')
-            with open(inputfile) as f:
-                ref_eligible_dict = json.load(f)
+            gitfile = com_utils.github_get_file(base_url=giturl,
+                                                repo=gitrepo,
+                                                path=inputfile,
+                                                git_token=gittoken,
+                                                branch=branch)
+
+            if gitfile:
+                logpim.info(f'Loading reference assignments from git {giturl}/{gitrepo}/{inputfile}')
+                ref_eligible_dict = json.loads(gitfile.read())
+            else:
+                logpim.error(f'Unable to fetch file form git repo.')
+                return False
+        else:
+            logpim.error('Invalid args. Exiting.')
+            return
 
         logpim.info('Generating Azure AD roles eligible assignments dict.')
         self.make_pim_assignments_dict()
@@ -147,8 +172,12 @@ class Pimmon(Aadiam):
                 logpim.error(f"PIM roles delta (role added): These roles defined in Azure AD, "
                              f"but not in reference file: {roles_not_in_ref_names}")
             if roles_not_in_aad:
-                logpim.error(f"PIM roles delta (role removed): These roles are defined in reference file, but"
+                logpim.error(f"PIM roles delta (role removed): These roles are defined in reference file, but "
                              f"missing in Azure AD: {roles_not_in_aad_names}")
+
+                for role in roles_not_in_aad:
+                    missing_mems = [self.aad_user_map[m] for m in ref_eligible_dict[role]]
+                    logpim.error(f"PIM Role missing eligible assignments: {self.aad_roles_map_rev[role]}:{missing_mems}")
         else:
             logpim.info('Eligible assignments roles match')
 
@@ -189,28 +218,53 @@ class Pimmon(Aadiam):
                             f'but not found in reference file: {ea_not_in_ref_names}')
                     if ea_not_in_aad:
                         logpim.error(
-                            f'PIM delta (assignment removed): The following objects are missing in role "{role_name}" eligible assignment,'
+                            f'PIM delta (assignment removed): The following objects are missing in role "{role_name}" eligible assignment, '
                             f'but found in reference file: {ea_not_in_aad_names}')
             except KeyError:
                 logpim.error(f"Role definition '{role_name}' not found in reference file")
 
-    def compare_active(self, inputdir, inputfile=None):
+    def compare_active(self, inputdir=None, inputfile=None, giturl=None, gitrepo=None, gittoken=None,
+                         branch="master"):
         """
         Compare current active PIM assignments against the inputfile
         :param inputfile:
         :return:
         """
-        if not os.path.isdir(inputdir):
-            logpim.error(f"Path not found = '{inputdir}'")
-            return False
+        logpim.title("Starting PIM Active assignments verification")
+        if inputdir:
+            if not os.path.isdir(inputdir):
+                logpim.error(f"Path not found = '{inputdir}'")
+                return False
+            else:
+                if not inputfile:
+                    inputfile = os.path.join(inputdir, f"{tenancy.split('.')[0]}_active.json")
+                if os.path.isfile(inputfile):
+                    logpim.info(f'Loading reference assignments from "{inputfile}"')
+                    with open(inputfile) as f:
+                        ref_active_dict = json.load(f)
+                else:
+                    logpim.error(f'File not found - "{inputfile}"')
+                    return False
 
-        if not inputfile:
-            inputfile = os.path.join(inputdir, f"{tenancy.split('.')[0]}_active.json")
+        elif all([gitrepo, gittoken]):
+            if not inputfile:
+                inputfile = f"{tenancy.split('.')[0]}_active.json"
 
-        if os.path.isfile(inputfile):
-            logpim.info(f'Loading reference assignments from "{inputfile}"')
-            with open(inputfile) as f:
-                ref_active_dict = json.load(f)
+            gitfile = com_utils.github_get_file(base_url=giturl,
+                                                repo=gitrepo,
+                                                path=inputfile,
+                                                git_token=gittoken,
+                                                branch=branch)
+
+            if gitfile:
+                logpim.info(f'Loading reference assignments from git {giturl}/{gitrepo}/{inputfile}')
+                ref_active_dict = json.loads(gitfile.read())
+            else:
+                logpim.error(f'Unable to fetch file form git repo.')
+                return False
+        else:
+            logpim.error('Invalid args. Exiting')
+            return
 
         logpim.info('Generating Azure AD roles active assignments dict.')
 
@@ -232,7 +286,10 @@ class Pimmon(Aadiam):
                              f"but not in reference file: {roles_not_in_ref_names}")
             if roles_not_in_aad:
                 logpim.error(f"PIM roles delta (role removed): These roles are defined in reference file, but"
-                             f"missing in Azure AD: {roles_not_in_aad_names}")
+                             f" missing in Azure AD: {roles_not_in_aad_names}")
+                for role in roles_not_in_aad:
+                    missing_mems = [self.aad_user_map[m] for m in ref_active_dict[role]]
+                    logpim.error(f"PIM Role missing active assignments: {self.aad_roles_map_rev[role]}:{missing_mems}")
         else:
             logpim.info('Active assignment roles match')
 
@@ -268,7 +325,7 @@ class Pimmon(Aadiam):
                             f'but not found in reference file: {ea_not_in_ref_names}')
                     if ea_not_in_aad:
                         logpim.error(
-                            f'PIM delta (assignment removed): The following objects are missing in role "{role_name}" active assignment,'
+                            f'PIM delta (assignment removed): The following objects are missing in role "{role_name}" active assignment, '
                             f'but found in reference file: {ea_not_in_aad_names}')
             except KeyError:
                 logpim.error(f"Role definition '{role_name}' not found in reference file")

@@ -556,6 +556,7 @@ class Aadiam(AzureAd):
         :param create: Create target group if missing in Azure AD
         :return:
         """
+        logad.title("Starting group sync using JSON file")
         if os.path.isfile(filename):
             try:
                 with open(filename) as f:
@@ -589,6 +590,7 @@ class Aadiam(AzureAd):
         :param branch:
         :return:
         """
+        logad.title("Starting group sync using git repo")
         if git_url:
             base_url = git_url
         else:

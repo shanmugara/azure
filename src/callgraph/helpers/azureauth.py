@@ -74,6 +74,7 @@ class AzureAd(object):
         self.session.mount("https://", HTTPAdapter(max_retries=retries))
 
         self.cert_auth = cert_auth
+        log.title("Authenticating to Azure AD")
         log.info('Current Azure tenancy: {}'.format(tenancy))
 
         if self.cert_auth:
