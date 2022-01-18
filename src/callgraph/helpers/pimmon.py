@@ -1,6 +1,8 @@
 import json
 import platform
 import os
+import re
+
 from callgraph.helpers.aadiam import Aadiam
 from callgraph.helpers import my_logger
 from callgraph.helpers import com_utils
@@ -119,7 +121,7 @@ class Pimmon(Aadiam):
         :return:
         """
         logpim.title("Starting PIM Eligible assignments verification")
-        if inputdir:
+        if all([inputdir, not giturl, not gittoken, not gitrepo]):
             if not os.path.isdir(inputdir):
                 logpim.error(f"Path not found = '{inputdir}'")
                 return False
@@ -137,6 +139,10 @@ class Pimmon(Aadiam):
         elif all([gitrepo, gittoken]):
             if not inputfile:
                 inputfile = f"{tenancy.split('.')[0]}_eligible.json"
+
+            if inputdir:
+                inputfile = os.path.join(inputdir, inputfile)
+                inputfile = re.sub(r"\\", r"/", inputfile)
 
             gitfile = com_utils.github_get_file(base_url=giturl,
                                                 repo=gitrepo,
@@ -231,7 +237,7 @@ class Pimmon(Aadiam):
         :return:
         """
         logpim.title("Starting PIM Active assignments verification")
-        if inputdir:
+        if all([inputdir, not giturl, not gittoken, not gitrepo]):
             if not os.path.isdir(inputdir):
                 logpim.error(f"Path not found = '{inputdir}'")
                 return False
@@ -249,6 +255,11 @@ class Pimmon(Aadiam):
         elif all([gitrepo, gittoken]):
             if not inputfile:
                 inputfile = f"{tenancy.split('.')[0]}_active.json"
+
+            if inputdir:
+                inputfile = os.path.join(inputdir, inputfile)
+                inputfile = re.sub(r"\\", r"/", inputfile)
+                logpim.info(f"Full path to inputfile: {inputfile}")
 
             gitfile = com_utils.github_get_file(base_url=giturl,
                                                 repo=gitrepo,

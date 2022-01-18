@@ -1,16 +1,17 @@
 from setuptools import setup
 import os
+from callgraph.helpers.__version__ import version
 
 req_lst = ['requests','msal', 'PyGithub']
 if os.name == 'nt':
     req_lst.append('colorama')
 
-setup(name='callgraph',
-      version="0.0.10",
+setup(name='azuregraph',
+      version=version,
       description='Azure Graph API wrapper.',
       url='https://none.none',
       author='RP',
-      author_email='speriyasamy@',
+      author_email='speriyasamy@bloomberg.net',
       license='GPL',
       install_requires=req_lst,
       package_dir={"": "src"},

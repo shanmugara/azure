@@ -215,7 +215,7 @@ def main():
     pimmon_action.add_argument("-e", "--export", help="Create an export of current PIM roles", action="store_true")
     pimmon_action.add_argument("-m", "--monitor", help="Run a monitoring cycle for all roles", action="store_true")
     pimmon.add_argument("-d", "--dir", help="Relative directory path for reference file. "
-                                            "Git relative folder path if using git. (monitor|export)", required=False)
+                                            "Git relative folder path if using git. (monitor|export)", default=None, required=False)
     pimmon.add_argument("-r", "--repo", help="git repo name (monitor)", type=str, required=False)
     pimmon.add_argument("-o", "--token", help="Git API access toekn (monitor)", type=str, required=False)
     pimmon.add_argument("-u", "--giturl", help="Git API URL (monitor)", default="", required=False)
@@ -306,9 +306,25 @@ def main():
             elif args.command == "pimmon":
                 if all([args.export, args.dir]):
                     runner.pim.write_all_assignment_json(outdir=args.dir)
-                if all([args.dir, args.monitor]):
+
+                elif all([args.dir, args.monitor, not args.giturl]):
                     runner.pim.compare_eligible(inputdir=args.dir)
                     runner.pim.compare_active(inputdir=args.dir)
+
+                elif all([args.monitor, args.giturl, args.repo, args.token]):
+
+                    runner.pim.compare_eligible(inputdir=args.dir,
+                                                giturl=args.giturl,
+                                                gittoken=args.token,
+                                                gitrepo=args.repo,
+                                                branch=args.branch)
+
+                    runner.pim.compare_active(inputdir=args.dir,
+                                                giturl=args.giturl,
+                                                gittoken=args.token,
+                                                gitrepo=args.repo,
+                                                branch=args.branch)
+
     else:
         return False
 

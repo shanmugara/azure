@@ -15,6 +15,7 @@ else:
 
 log = my_logger.My_logger(logdir=LOG_DIR, logfile='powershell')
 
+
 def add_timer(func):
     functools.wraps(func)
 
@@ -32,6 +33,7 @@ def add_timer(func):
 
     return timed_func
 
+
 @add_timer
 def get_adgroupmember(groupname):
     """
@@ -40,7 +42,8 @@ def get_adgroupmember(groupname):
     :return:
     """
     cmd = os.path.join(app_root, 'admodule.ps1')
-    cmd_out = check_output(['powershell','-executionpolicy','bypass','-noprofile','-c',cmd,'-groupname',groupname])
+    cmd_out = check_output(
+        ['powershell', '-executionpolicy', 'bypass', '-noprofile', '-c', cmd, '-groupname', groupname])
     mems_lines = cmd_out.decode().splitlines()
     if 'failed_to_get_members' in mems_lines:
         mems_lines = False

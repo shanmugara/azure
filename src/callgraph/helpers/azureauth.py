@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 from callgraph.helpers import my_logger
 from callgraph.helpers import pki_helper
 from callgraph.helpers.config import config, cert, user, tenancy
+from callgraph.helpers.__version__ import version
 
 if platform.system().lower() == 'windows':
     LOG_DIR = os.path.join('c:\\', 'logs', 'azgraph')
@@ -74,7 +75,7 @@ class AzureAd(object):
         self.session.mount("https://", HTTPAdapter(max_retries=retries))
 
         self.cert_auth = cert_auth
-        log.title("Authenticating to Azure AD")
+        log.title(f"Callgraph v{version} - Authenticating to Azure AD")
         log.info('Current Azure tenancy: {}'.format(tenancy))
 
         if self.cert_auth:
@@ -87,7 +88,7 @@ class AzureAd(object):
         self.init_token()
 
         if auto_rotate:
-            log.info('Automated cert rotation is enabled. Checking cert valididty.')
+            log.info('Automated cert rotation is enabled. Checking cert validity.')
             self.rotate_this_cert(days=days)
 
     def init_app(self):
@@ -125,6 +126,8 @@ class AzureAd(object):
             log.info('Obtaining new auth token by certificate and key pair')
             self.auth = self.app.acquire_token_for_client(scopes=cert['scope'])
         else:
+            log.title("User Authentication")
+            log.info(f"User account: {user['username']}")
             accounts = self.app.get_accounts(username=user["username"])
             if accounts:
                 log.info("Account(s) exists in cache, probably with token too. Let's try.")
@@ -153,7 +156,10 @@ class AzureAd(object):
         Get cert creds dict
         :return:
         """
+        log.title("Certificate Authentication")
         if all([os.path.isfile(cert['cert_path']), os.path.isfile(cert['cert_key_path'])]):
+            log.info(f"Cert file: {cert['cert_path']}")
+            log.info(f"Key file: {cert['cert_key_path']}")
             with open(cert['cert_path']) as f:
                 cert_file = f.read()
             with open(cert['cert_key_path']) as f:

@@ -253,7 +253,7 @@ class AadCa(AzureAd):
                     logcap.error('Unable to find a matching named location')
                     return False
             else:
-                logcap.error('Unable to find either displayName or id attributed in the CSV. Exiting')
+                logcap.error('Unable to find either displayName or id attributes in the CSV. Exiting')
                 return False
 
             iprange_lst = []

@@ -21,8 +21,8 @@ utillog = my_logger.My_logger(logdir=LOG_DIR, logfile='com_utils')
 def write_out_file(outdir, filename, outlines):
     """
     Write the outfile to newfile, if file exisits rename old file to renfile
-    :param newfile: new file name
-    :param renfile: renamed file name for existing file
+    :param filename:
+    :param outdir:
     :param outlines: file data
     :return:
     """
@@ -39,11 +39,11 @@ def write_out_file(outdir, filename, outlines):
 
         if isinstance(outlines, list):
             with open(outfile_csv, 'w') as f:
-                utillog.info('Writing file {}'.format(outfile_csv))
+                utillog.info('Writing report file {}'.format(outfile_csv))
                 f.writelines(outlines)
         elif isinstance(outlines, str):
             with open(outfile_csv, 'w') as f:
-                utillog.info('Writing file {}'.format(outfile_csv))
+                utillog.info('Writing report file {}'.format(outfile_csv))
                 f.write(outlines)
 
 

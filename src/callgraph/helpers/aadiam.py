@@ -401,14 +401,16 @@ class Aadiam(AzureAd):
 
         if gtype == int(365):
             group_type = ['Unified']
+            mail_enabled = True
         else:
             group_type = []
+            mail_enabled = False
 
         data_dict = {
             'displayName': groupname,
             'description': 'Created by API',
             'isAssignableToRole': role_enable,
-            'mailEnabled': False,
+            'mailEnabled': mail_enabled,
             'mailNickname': groupname,
             'securityEnabled': True,
             'groupTypes': group_type
@@ -553,6 +555,7 @@ class Aadiam(AzureAd):
         }
         --end--
         :param filename:
+        :param test: Test mode with no writes
         :param create: Create target group if missing in Azure AD
         :return:
         """
@@ -588,6 +591,8 @@ class Aadiam(AzureAd):
         :param filepath:
         :param token:
         :param branch:
+        :param test: Test mode with no writes
+        :param create: Create target group if missing in Azure AD
         :return:
         """
         logad.title("Starting group sync using git repo")
@@ -615,8 +620,36 @@ class Aadiam(AzureAd):
         except Exception as e:
             logad.error(f'Exception was thrown while getting file from github repo - {e}')
 
+    def json_sync_proc(self, json_file_dict, test=False, create=False):
+        """
+        This function will run the group sync for teh given JSON file. This method will support both filesystem file
+        as well as github file. The common parsing for both modes are consolidated here to minimize code repetition.
+        :param json_file_dict:
+        :param test: Run in test mode with no writes
+        :param create: Create target group in Azure AD if doesnt exist
+        :return:
+        """
+        if isinstance(json_file_dict, dict):
+            #check if file is new type or legacy
+            if set(json_file_dict.keys()) == {'security', '365'}:
+                #new type
+                for sg in json_file_dict['security'].keys():
+                    self.sync_group(adgroup=sg, clgroup=json_file_dict[sg], test=test, create=create, gtype=None)
+
+                for og in json_file_dict['365'].keys():
+                    self.sync_group(adgroup=og, clgroup=json_file_dict[og], test=test, create=create, gtype=365)
+
+            else:
+                #legacy type
+                for g in json_file_dict.keys():
+                    self.sync_group(adgroup=g, clgroup=json_file_dict[g], test=test, create=create, gtype=None)
+
+        else:
+            logad.error("Invalid arg type given to json_sync_proc, expected dict.")
+            return False
+
     @Timer.add_timer
-    def sync_group(self, adgroup, clgroup, test=False, create=False):
+    def sync_group(self, adgroup, clgroup, test=False, create=False, gtype=None):
         """
         Get group members from on-prem AD group and add to a AAD cloud group, and remove members not in on-prem AD group
         from cloud group. AD group is retrieved from on-prem ad. requires quest powershell module for ad. On-prem AD group
@@ -649,7 +682,7 @@ class Aadiam(AzureAd):
                 if create:
                     logad.warning(f'Target Azure AD group "{clgroup}" doesnt exist. Will auto create new group.')
                     if not test:
-                        result = self.create_target_group(groupname=clgroup)
+                        result = self.create_target_group(groupname=clgroup, gtype=gtype)
                         if not result:
                             logad.error('Creating target group failed. Exiting..')
                             return False
@@ -734,14 +767,14 @@ class Aadiam(AzureAd):
             traceback.print_exc()
             return False
 
-    def create_target_group(self, groupname):
+    def create_target_group(self, groupname, gtype=None):
         """
         This method will auto create teh target cloud group during sync, if the target group is missing in Azure AD.
         The created group will be a role enabled security group
         :param groupname: group name to create in Azure AD
         :return:
         """
-        result = self.create_aad_group(groupname=groupname, role_enable=True)
+        result = self.create_aad_group(groupname=groupname, role_enable=True, gtype=gtype)
         if result:
             if int(result.status_code) == 201:
                 count = 0
