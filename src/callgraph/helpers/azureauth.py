@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 from callgraph.helpers import my_logger
 from callgraph.helpers import pki_helper
 from callgraph.helpers.config import config, cert, user, tenancy
-from callgraph.helpers.__version__ import version
+from callgraph.helpers.version import version
 
 if platform.system().lower() == 'windows':
     LOG_DIR = os.path.join('c:\\', 'logs', 'azgraph')

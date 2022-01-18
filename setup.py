@@ -1,6 +1,10 @@
 from setuptools import setup
 import os
-from callgraph.helpers.__version__ import version
+import sys
+
+sys.path.insert(0, "src")
+from callgraph.helpers.version import version
+
 
 req_lst = ['requests','msal', 'PyGithub']
 if os.name == 'nt':
