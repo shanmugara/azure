@@ -634,10 +634,10 @@ class Aadiam(AzureAd):
             if set(json_file_dict.keys()) == {'security', '365'}:
                 #new type
                 for sg in json_file_dict['security'].keys():
-                    self.sync_group(adgroup=sg, clgroup=json_file_dict[sg], test=test, create=create, gtype=None)
+                    self.sync_group(adgroup=sg, clgroup=json_file_dict['security'][sg], test=test, create=create, gtype=None)
 
                 for og in json_file_dict['365'].keys():
-                    self.sync_group(adgroup=og, clgroup=json_file_dict[og], test=test, create=create, gtype=365)
+                    self.sync_group(adgroup=og, clgroup=json_file_dict['365'][og], test=test, create=create, gtype=365)
 
             else:
                 #legacy type
