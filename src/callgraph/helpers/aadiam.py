@@ -564,10 +564,11 @@ class Aadiam(AzureAd):
             try:
                 with open(filename) as f:
                     logad.info('loading file {}'.format(filename))
-                    syn_group_dict = json.load(f)
+                    sync_group_dict = json.load(f)
                     logad.info('processing groups from sync file..')
-                    for g in syn_group_dict:
-                        self.sync_group(adgroup=g, clgroup=syn_group_dict[g], test=test, create=create)
+                    self.json_sync_proc(sync_group_dict, test=test, create=create)
+                    # for g in syn_group_dict:
+                    #     self.sync_group(adgroup=g, clgroup=syn_group_dict[g], test=test, create=create)
                     logad.info('finished processing sync file..')
 
             except Exception as e:
@@ -613,8 +614,9 @@ class Aadiam(AzureAd):
             if git_file:
                 logad.info('processing groups from sync file (git repo)..')
                 sync_group_dict = json.loads(git_file.read())
-                for g in sync_group_dict:
-                    self.sync_group(adgroup=g, clgroup=sync_group_dict[g], test=test, create=create)
+                self.json_sync_proc(sync_group_dict, test=test, create=create)
+                # for g in sync_group_dict:
+                #     self.sync_group(adgroup=g, clgroup=sync_group_dict[g], test=test, create=create)
                 logad.info('finished processing sync file (git repo)..')
 
         except Exception as e:
