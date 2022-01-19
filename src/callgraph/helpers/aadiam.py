@@ -660,7 +660,11 @@ class Aadiam(AzureAd):
         :return:
         """
         try:
-            logad.info('Start syncing AD group "{}" to cloud group "{}"'.format(adgroup, clgroup))
+            if not gtype:
+                g_type = "Security"
+            else:
+                g_type = "365"
+            logad.info('Start syncing AD group "{}" to cloud group "{}", type "{}"'.format(adgroup, clgroup, g_type))
             if not hasattr(self, 'all_aad_grp_ids'):
                 self.make_aad_grp_id_map()
 
@@ -675,7 +679,7 @@ class Aadiam(AzureAd):
             self.cldgroup_members_full = self.get_aad_members(groupname=clgroup)
 
             if self.cldgroup_members_full == False:
-                logad.error(f'Unable to get Azure AD goup "{clgroup}". API call failed. Exiting.')
+                logad.error(f'Unable to get Azure AD group "{clgroup}". API call failed. Exiting.')
                 return False
             elif self.cldgroup_members_full == 'noobj':
                 logad.error(f'Unable to find group object "{clgroup}" in Azure AD')
