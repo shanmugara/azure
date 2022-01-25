@@ -79,17 +79,20 @@ class Aadiam(AzureAd):
 
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "ConsistencyLevel": "eventual"}
 
+        filter_suffix = "$top=999&$select=onPremisesSyncEnabled,id,userPrincipalName,businessPhones,displayName,givenName," \
+                 "jobTitle,mail,mobilePhone,officeLocation,surname"
+
         if displayname:
             query_str = "?$filter=displayName eq '{}'".format(displayname)
         elif loginid:
             query_str = "?$filter=startswith(userPrincipalname, '{}@')".format(loginid)
         else:
-            filter = "?$top=999&$select=onPremisesSyncEnabled,id,userPrincipalName,businessPhones,displayName,givenName," \
-                     "jobTitle,mail,mobilePhone,officeLocation,surname"
-            query_str = filter
+            # filter = "?$top=999&$select=onPremisesSyncEnabled,id,userPrincipalName,businessPhones,displayName,givenName," \
+            #          "jobTitle,mail,mobilePhone,officeLocation,surname"
+            query_str = "?"
         page = True
         allusers_full = []
-        _endpoint = config["apiurl"] + "/users" + query_str
+        _endpoint = config["apiurl"] + "/users" + query_str + "&" + filter_suffix
 
         while page:
             result = self.session.get(_endpoint, headers=raw_headers)
@@ -512,22 +515,11 @@ class Aadiam(AzureAd):
         else:
             logad.error('did not get group object for group "{}"'.format(groupname))
             return False
-        user_oid = False
-        if hasattr(self, 'upn_id_map'):
-            try:
-                user_oid = self.upn_id_map[owner_id.lower()]
-            except KeyError:
-                logad.warning('User "{}" not found in cache, will try to fetch from Azure AD'.format(owner_id))
-        else:
-            logad.warning('No cached user upn id map was found. Will fetch user from Azure AD')
 
+        user_oid = self.get_upn_uid(owner_id)
         if not user_oid:
-            user_obj = self.get_aad_user(loginid=owner_id)
-            if user_obj:
-                user_oid = user_obj[0]['id']
-            else:
-                logad.error('Unable find user object for "{}". Giving up.'.format(owner_id))
-                return False
+            logad.error(f"Unable to get UID for user '{owner_id}'")
+            return False
 
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
         _endpoint = config['apiurl'] + '/groups/{}/owners/$ref'.format(group_oid)
@@ -537,11 +529,69 @@ class Aadiam(AzureAd):
 
         try:
             result = self.session.post(url=_endpoint, headers=raw_headers, data=data_json)
-            logad.info("Set owner result code: {}".format(result.status_code))
+
+            if int(result.status_code) == 204:
+                logad.info(f"Set owner result code: {result.status_code}")
+                return True
+            else:
+                logad.error(f"Set owner result code: {result.status_code}")
+                return False
 
         except Exception as e:
-            logad.error('Exception while making REST call - {}'.format(e))
+            logad.error(f'Exception while making REST call - {e}')
             return False
+
+    def get_upn_uid(self, owner_id):
+        """
+        Get the UID for a given user object
+        :param owner_id: samaccountname of the user
+        :return:
+        """
+        user_oid = False
+        if hasattr(self, 'upn_id_map'):
+            try:
+                user_oid = self.upn_id_map[owner_id.lower()]
+                return user_oid
+            except KeyError:
+                logad.warning('User "{}" not found in cache, will try to fetch from Azure AD'.format(owner_id))
+        else:
+            logad.warning('No cached user upn id map was found. Will fetch user from Azure AD')
+
+        if not user_oid:
+            user_obj = self.get_aad_user(loginid=owner_id)
+            if user_obj:
+                user_oid = user_obj[0]['id']
+                return user_oid
+            else:
+                logad.error('Unable find user object for "{}". Giving up.'.format(owner_id))
+                return False
+
+
+    def get_group_owner(self, groupname):
+        """
+        Return teh owner for the given groupname object
+        :param groupname:
+        :return:
+        """
+        grp_obj = self.get_aad_group(groupname)
+
+        if not grp_obj['value']:
+            logad.error(f"Did not find group object for '{groupname}' in Azure AD. Exiting")
+            return False
+
+
+        raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
+        _endpoint = config['apiurl'] + f"/groups/{grp_obj['value'][0]['id']}/owners/"
+
+        try:
+            result = self.session.get(url=_endpoint, headers=raw_headers)
+            return result
+
+        except Exception as e:
+            logad.error(f'Exception while making REST call - {e}')
+            return False
+
+
 
     @Timer.add_timer
     def sync_group_json(self, filename, test=False, create=False):
@@ -606,7 +656,6 @@ class Aadiam(AzureAd):
             except:
                 logad.info('No git url was specified. Defaulting to https://api.github.com')
                 base_url = 'https://api.github.com'
-
 
         try:
             logad.info(f'Fetching file from git url: {base_url} repo: {repo}, filepath: {filepath}')
