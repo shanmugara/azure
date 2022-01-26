@@ -1,4 +1,3 @@
-
 import time
 import json
 import os
@@ -73,23 +72,27 @@ class Aadiam(AzureAd):
         Search for a user by displayname. This is a wildcard search.
         :param displayname: display name
         :param loginid: samaccountname
-        :param onprem: get only on prem synced accounts
+        :param onprem: get only on prem synced accounts, if False return both on-prem and cloud objects
         :return:
         """
 
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "ConsistencyLevel": "eventual"}
 
         filter_suffix = "$top=999&$select=onPremisesSyncEnabled,id,userPrincipalName,businessPhones,displayName,givenName," \
-                 "jobTitle,mail,mobilePhone,officeLocation,surname"
+                        "jobTitle,mail,mobilePhone,officeLocation,surname"
 
         if displayname:
             query_str = "?$filter=displayName eq '{}'".format(displayname)
         elif loginid:
-            query_str = "?$filter=startswith(userPrincipalname, '{}@')".format(loginid)
+            # If loginid doesnt contain @ append @, else pass loginid as is for filter
+            if not re.match('([a-zA-Z0-9]+@)', loginid):
+                loginid += '@'
+            query_str = f"?$filter=startswith(userPrincipalname, '{loginid}')"
+
         else:
-            # filter = "?$top=999&$select=onPremisesSyncEnabled,id,userPrincipalName,businessPhones,displayName,givenName," \
-            #          "jobTitle,mail,mobilePhone,officeLocation,surname"
+            # Get all users
             query_str = "?"
+
         page = True
         allusers_full = []
         _endpoint = config["apiurl"] + "/users" + query_str + "&" + filter_suffix
@@ -246,7 +249,6 @@ class Aadiam(AzureAd):
             logad.error(f'Did not get an Azure AD group object "{groupname}"')
             return "noobj"
 
-
     @Timer.add_timer
     def aad_user_upn_map(self, onprem=True):
         """
@@ -374,7 +376,6 @@ class Aadiam(AzureAd):
         except Exception as e:
             logad.error(f'Exception while making API call - {e}')
 
-
     def make_aad_roles_map(self):
         """
         Generate a dict of roles {display name: id}
@@ -416,8 +417,8 @@ class Aadiam(AzureAd):
             'mailEnabled': mail_enabled,
             'mailNickname': groupname,
             'securityEnabled': True,
-            'groupTypes': group_type
-
+            'groupTypes': group_type,
+            'visibility': 'Private'
         }
 
         data_json = json.dumps(data_dict)
@@ -532,6 +533,8 @@ class Aadiam(AzureAd):
 
             if int(result.status_code) == 204:
                 logad.info(f"Set owner result code: {result.status_code}")
+                # logad.info("Sleep 30 secs for propogation")
+                # time.sleep(30)
                 return True
             else:
                 logad.error(f"Set owner result code: {result.status_code}")
@@ -566,7 +569,6 @@ class Aadiam(AzureAd):
                 logad.error('Unable find user object for "{}". Giving up.'.format(owner_id))
                 return False
 
-
     def get_group_owner(self, groupname):
         """
         Return teh owner for the given groupname object
@@ -579,7 +581,6 @@ class Aadiam(AzureAd):
             logad.error(f"Did not find group object for '{groupname}' in Azure AD. Exiting")
             return False
 
-
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
         _endpoint = config['apiurl'] + f"/groups/{grp_obj['value'][0]['id']}/owners/"
 
@@ -590,8 +591,6 @@ class Aadiam(AzureAd):
         except Exception as e:
             logad.error(f'Exception while making REST call - {e}')
             return False
-
-
 
     @Timer.add_timer
     def sync_group_json(self, filename, test=False, create=False):
@@ -659,7 +658,8 @@ class Aadiam(AzureAd):
 
         try:
             logad.info(f'Fetching file from git url: {base_url} repo: {repo}, filepath: {filepath}')
-            git_file = com_utils.github_get_file(base_url=base_url, repo=repo, path=filepath, git_token=token, branch=branch)
+            git_file = com_utils.github_get_file(base_url=base_url, repo=repo, path=filepath, git_token=token,
+                                                 branch=branch)
             if git_file:
                 logad.info('processing groups from sync file (git repo)..')
                 sync_group_dict = json.loads(git_file.read())
@@ -681,17 +681,18 @@ class Aadiam(AzureAd):
         :return:
         """
         if isinstance(json_file_dict, dict):
-            #check if file is new type or legacy
+            # check if file is new type or legacy
             if set(json_file_dict.keys()) == {'security', '365'}:
-                #new type
+                # new type
                 for sg in json_file_dict['security'].keys():
-                    self.sync_group(adgroup=sg, clgroup=json_file_dict['security'][sg], test=test, create=create, gtype=None)
+                    self.sync_group(adgroup=sg, clgroup=json_file_dict['security'][sg], test=test, create=create,
+                                    gtype=None)
 
                 for og in json_file_dict['365'].keys():
                     self.sync_group(adgroup=og, clgroup=json_file_dict['365'][og], test=test, create=create, gtype=365)
 
             else:
-                #legacy type
+                # legacy type
                 for g in json_file_dict.keys():
                     self.sync_group(adgroup=g, clgroup=json_file_dict[g], test=test, create=create, gtype=None)
 
@@ -724,7 +725,8 @@ class Aadiam(AzureAd):
 
             adgroup_members = powershell.get_adgroupmember(groupname=adgroup)
             if adgroup_members == False:
-                logad.error('Unable to get on-prem AD group members for "{}". Check group name. Exiting.'.format(adgroup))
+                logad.error(
+                    'Unable to get on-prem AD group members for "{}". Check group name. Exiting.'.format(adgroup))
                 return False
 
             self.cldgroup_members_full = self.get_aad_members(groupname=clgroup)
@@ -849,7 +851,6 @@ class Aadiam(AzureAd):
         else:
             logad.error('Error while creating target group. Upstream method call failed.')
             return False
-
 
     def add_member(self, userid, gid):
         """
