@@ -45,7 +45,7 @@ class My_logger(object):
         # stream_formatter = logging.Formatter('\x1b[1;32m %(levelname)s:%(name)s:%(message)s \x1b[0m')
 
         self.stream_formatter = logging.Formatter(
-            "\x1b[32m[%(levelname)s]\x1b[0m: \x1b[37m%(message)s\x1b[0m"
+            "\x1b[32m[%(levelname)s]: \x1b[37m%(message)s\x1b[0m"
         )
         self.stream_handler.setFormatter(self.stream_formatter)
         self.stream.info(message)

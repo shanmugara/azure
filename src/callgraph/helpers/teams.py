@@ -1,15 +1,11 @@
 import json
 import platform
 import os
-import re
-import time
 from time import sleep
 
 from callgraph.helpers.aadiam import Aadiam
 from callgraph.helpers import my_logger
-from callgraph.helpers import com_utils
 from callgraph.helpers.config import config
-from callgraph.helpers.config import tenancy
 
 if platform.system().lower() == 'windows':
     LOG_DIR = os.path.join('c:\\', 'logs', 'azgraph')
@@ -18,6 +14,7 @@ else:
 
 logteams = my_logger.My_logger(logdir=LOG_DIR, logfile='teams')
 
+# Waiting for Azure AD convergence. Sleep {delay} secs.
 
 class Teams(Aadiam):
     def __init__(self, cert_auth=True, auto_rotate=False, days=30):
@@ -68,24 +65,35 @@ class Teams(Aadiam):
         data_json = json.dumps(data_dict)
 
         try:
-            delay = 15
+            delay = 5
             delay_max = 90
             logteams.info(f"Creating a new TEAMS site for '{groupname}'")
             # set owner first
             logteams.info(f"Verifying owner '{owner}' for '{groupname}'")
             if not self.verify_owner(groupname=groupname, owner=owner):
                 logteams.info(f"Updating group owner to '{owner}'")
-                owner_r = self.set_group_owner(groupname, owner_id=owner)
-                if not owner_r:
-                    logteams.error("Setting owner failed. Exiting.")
-                    return False
+
+                owner_set = False
+                t = 0
+
+                while not owner_set:
+                    owner_r = self.set_group_owner(groupname, owner_id=owner)
+                    if not owner_r:
+                        sleep(delay)
+                        t =+ delay
+                        if t >= delay_max:
+                            logteams.error("Setting owner failed with timeout. Exiting.")
+                            return False
+                    else:
+                        owner_set = True
+
                 t = 0
                 while not self.verify_owner(groupname=groupname, owner=owner):
-                    logteams.info(f"Sleeping {delay} secs for propogation..")
+                    logteams.info(f"Waiting for Azure AD convergence. Sleep {delay} secs.")
                     sleep(delay)
                     t += delay
                     if t >= delay_max:
-                        logteams.error(f"Propogation delay exceeded {delay_max} secs. Exiting")
+                        logteams.error(f"Convergence delay exceeded {delay_max} secs. Exiting.")
                         return False
 
             site_chk = False
@@ -98,11 +106,11 @@ class Teams(Aadiam):
                     return True
                 else:
 
-                    logteams.info(f"Propogation delay. Sleep {delay} secs before retrying.")
+                    logteams.info(f"Waiting for Azure AD convergence. Sleep {delay} secs.")
                     sleep(delay)
                     t += delay
                     if t >= delay_max:
-                        logteams.error(f"Propogation took longer than {delay_max} secs. Exiting.")
+                        logteams.error(f"Convergence delay exceeded {delay_max} secs. Exiting.")
                         logteams.error(f"Enabling TEAMS for '{groupname}' failed with status {result.status_code}")
                         logteams.error(result.json())
 
@@ -122,7 +130,7 @@ class Teams(Aadiam):
         grp_obj = self.get_aad_group(groupname)
         if not grp_obj['value']:
             logteams.error(f"Group object '{groupname} not found in Azure AD")
-            return False
+            return None, False
 
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
         _endpoint = config["apiurl"] + f"/teams/{grp_obj['value'][0]['id']}"
@@ -144,7 +152,8 @@ class Teams(Aadiam):
             logteams.error(f"REST API call to get TEAMS failed with Exception - '{e}'")
             return False
 
-    def new_teams(self, groupname, owner=None):
+    @Aadiam.Timer.add_timer
+    def new_team(self, groupname, owner=None, creategroup=False):
         """
         create a new TEAMS for the groupname, set owner. If the TEAMS already exists, verify the owner is set correctly.
         :param groupname:
@@ -160,7 +169,7 @@ class Teams(Aadiam):
 
         # if site doesnt exist create one
         if not site_found:
-            result = self.create_team_from_group(groupname, owner=owner)
+            result = self.create_team_from_group(groupname, owner=owner, creategroup=creategroup)
             if not result:
                 logteams.error(f"Failed to create TEAMS site for '{groupname}'")
                 return False
@@ -213,25 +222,24 @@ class Teams(Aadiam):
 
         result = self.create_aad_group(groupname=groupname, role_enable=False, gtype=365)
         if int(result.status_code) == 201:
+            delay = 5
+            delay_max = 60
             g = None
             timeout = None
             t = 0
-            while all([not g, not timeout]):
-                logteams.info("Propogation delay. Sleep 15 secs")
-                sleep(15)
+            while not g:
+                logteams.info(f"Waiting for Azure AD convergence. Sleep {delay} secs.")
+                sleep(delay)
                 g_o = self.get_aad_group(groupname)
                 g = g_o['value']
                 if not g:
-                    t += 15
-                    if t >= 60: timeout = True
-                    logteams.error("Propogation took longer than 60 secs. Exiting.")
-                    return g_o, False
+                    t += delay
+                    if t >= delay_max:
+                        logteams.error(f"Propogation took longer than {delay_max} secs. Exiting.")
+                        return g_o, False
                 else:
                     logteams.info(f"Group '{groupname}' created successfully.")
                     return g_o, True
         else:
             logteams.error(f"Group creation has failed with status: {result.status_code}")
             return False
-
-
-
