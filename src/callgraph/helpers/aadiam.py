@@ -690,10 +690,10 @@ class Aadiam(AzureAd):
                         role_enable = json_file_dict['role_enable']
                         logad.info(f"role_enable = {role_enable}")
                     else:
-                        logad.warning("Fallback role_enable=True")
+                        logad.warning("Fallback (invalid key value, using default) role_enable=True")
                         role_enable = True
                 else:
-                    logad.warning("Fallback level 2, role_enable=True")
+                    logad.warning("Fallback (no key found, using default), role_enable=True")
                     role_enable = True
 
                 for sg in json_file_dict['security'].keys():
@@ -706,6 +706,7 @@ class Aadiam(AzureAd):
 
             else:
                 # legacy type
+                logad.info("Detected legacy json file schema type.")
                 for g in json_file_dict.keys():
                     self.sync_group(adgroup=g, clgroup=json_file_dict[g], test=test, create=create,
                                     gtype=None, role_enable=True)
