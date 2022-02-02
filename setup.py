@@ -3,7 +3,7 @@ import os
 import sys
 
 sys.path.insert(0, "src")
-from callgraph.helpers.version import version
+from callgraph.helpers.__version__ import version
 
 
 req_lst = ['requests','msal', 'PyGithub']

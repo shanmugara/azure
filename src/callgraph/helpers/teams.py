@@ -18,7 +18,7 @@ logteams = my_logger.My_logger(logdir=LOG_DIR, logfile='teams')
 
 class Teams(Aadiam):
     def __init__(self, cert_auth=True, auto_rotate=False, days=30):
-        super(Aadiam, self).__init__(cert_auth=cert_auth, auto_rotate=auto_rotate, days=days)
+        super(Teams, self).__init__(cert_auth=cert_auth, auto_rotate=auto_rotate, days=days)
         self.make_aad_roles_map()
 
     def create_team_from_group(self, groupname, owner, creategroup=False):

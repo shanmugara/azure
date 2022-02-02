@@ -151,7 +151,14 @@ def main():
         help="Run in test mode, no writes",
         action="store_true",
     )
-    group_sync.set_defaults(testmode=False)
+
+    group_sync.add_argument(
+        "--no-roleenable",
+        help="Do not role enable target group during creation. Default is to role enable.",
+        action="store_false",
+    )
+    group_sync.set_defaults(testmode=False, roleenable=True)
+
     filename = group_sync.add_mutually_exclusive_group()
     filename.add_argument(
         "-a", "--adgroup", help="AD group name", required=False, type=str
