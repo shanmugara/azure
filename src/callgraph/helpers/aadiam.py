@@ -684,29 +684,21 @@ class Aadiam(AzureAd):
             # check if file is new type or legacy
             if set(json_file_dict.keys()) == {'security', '365'}:
                 # new type
-                if json_file_dict['security'].get('role_enable'):
-                    if isinstance(json_file_dict['security']['role_enable'], bool):
-                        role_enable_sec = json_file_dict['security']['role_enable']
+                if json_file_dict.get('role_enable'):
+                    if isinstance(json_file_dict['role_enable'], bool):
+                        role_enable = json_file_dict['role_enable']
                     else:
-                        role_enable_sec = True
+                        role_enable = True
                 else:
-                    role_enable_sec = True
-
-                if json_file_dict['365'].get('role_enable'):
-                    if isinstance(json_file_dict['365']['role_enable'], bool):
-                        role_enable_365 = json_file_dict['365']['role_enable']
-                    else:
-                        role_enable_365 = True
-                else:
-                    role_enable_365 = True
+                    role_enable = True
 
                 for sg in json_file_dict['security'].keys():
                     self.sync_group(adgroup=sg, clgroup=json_file_dict['security'][sg], test=test, create=create,
-                                    gtype=None, role_enable=role_enable_sec)
+                                    gtype=None, role_enable=role_enable)
 
                 for og in json_file_dict['365'].keys():
                     self.sync_group(adgroup=og, clgroup=json_file_dict['365'][og], test=test, create=create,
-                                    gtype=365, role_enable=role_enable_365)
+                                    gtype=365, role_enable=role_enable)
 
             else:
                 # legacy type
