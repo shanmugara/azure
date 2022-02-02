@@ -684,12 +684,16 @@ class Aadiam(AzureAd):
             # check if file is new type or legacy
             if set(json_file_dict.keys()) & {'security', '365'} == {'security', '365'}:
                 # new type
+                logad.info("Detected new json file schema type.")
                 if json_file_dict.get('role_enable'):
                     if isinstance(json_file_dict['role_enable'], bool):
                         role_enable = json_file_dict['role_enable']
+                        logad.info(f"role_enable = {role_enable}")
                     else:
+                        logad.warning("Fallback role_enable=True")
                         role_enable = True
                 else:
+                    logad.warning("Fallback level 2, role_enable=True")
                     role_enable = True
 
                 for sg in json_file_dict['security'].keys():
