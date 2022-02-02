@@ -685,7 +685,7 @@ class Aadiam(AzureAd):
             if set(json_file_dict.keys()) & {'security', '365'} == {'security', '365'}:
                 # new type
                 logad.info("Detected new json file schema type.")
-                if json_file_dict.get('role_enable'):
+                if 'role_enable' in json_file_dict.keys():
                     if isinstance(json_file_dict['role_enable'], bool):
                         role_enable = json_file_dict['role_enable']
                         logad.info(f"role_enable = {role_enable}")
