@@ -682,7 +682,7 @@ class Aadiam(AzureAd):
         """
         if isinstance(json_file_dict, dict):
             # check if file is new type or legacy
-            if set(json_file_dict.keys()) & {'security', '365'} == {'seurity', '365'}:
+            if set(json_file_dict.keys()) & {'security', '365'} == {'security', '365'}:
                 # new type
                 if json_file_dict.get('role_enable'):
                     if isinstance(json_file_dict['role_enable'], bool):
