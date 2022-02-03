@@ -703,7 +703,7 @@ class Aadiam(AzureAd):
 
                 for og in json_file_dict['365'].keys():
                     self.sync_group(adgroup=og, clgroup=json_file_dict['365'][og], test=test, create=create,
-                                    gtype=365, role_enable=role_enable)
+                                    gtype='365', role_enable=role_enable)
 
             else:
                 # legacy type
