@@ -684,7 +684,7 @@ class Aadiam(AzureAd):
             # check if file is new type or legacy
             if set(json_file_dict.keys()) & {'security', '365'} == {'security', '365'}:
                 # new type
-                logad.info("Detected new json file schema type.")
+                logad.info("Detected new input file schema type.")
                 if 'role_enable' in json_file_dict.keys():
                     if isinstance(json_file_dict['role_enable'], bool):
                         role_enable = json_file_dict['role_enable']
@@ -706,7 +706,7 @@ class Aadiam(AzureAd):
 
             else:
                 # legacy type
-                logad.info("Detected legacy json file schema type.")
+                logad.info("Detected legacy input file schema type.")
                 for g in json_file_dict.keys():
                     self.sync_group(adgroup=g, clgroup=json_file_dict[g], test=test, create=create,
                                     gtype=None, role_enable=True)
@@ -732,8 +732,12 @@ class Aadiam(AzureAd):
         try:
             if not gtype:
                 g_type = "Security"
-            else:
+            elif gtype == 365 or gtype == "365":
                 g_type = "365"
+            else:
+                logad.error(f"Invalid gtype'{gtype}'. Must be either None|365.")
+                return False
+
             logad.info('Start syncing AD group "{}" to cloud group "{}", type "{}"'.format(adgroup, clgroup, g_type))
             if not hasattr(self, 'all_aad_grp_ids'):
                 self.make_aad_grp_id_map()
