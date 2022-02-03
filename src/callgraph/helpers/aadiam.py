@@ -762,7 +762,7 @@ class Aadiam(AzureAd):
                 if create:
                     logad.warning(f'Target Azure AD group "{clgroup}" doesnt exist. Will auto create new group.')
                     if not test:
-                        result = self.create_target_group(groupname=clgroup, role_enable=role_enable, gtype=gtype)
+                        result = self.create_target_group(groupname=clgroup, role_enable=role_enable, gtype=g_type)
                         if not result:
                             logad.error('Creating target group failed. Exiting..')
                             return False
