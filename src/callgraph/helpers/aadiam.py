@@ -403,7 +403,7 @@ class Aadiam(AzureAd):
         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
         _endpoint = config["apiurl"] + "/groups"
 
-        if gtype == int(365):
+        if gtype == 365 or gtype == "365":
             group_type = ['Unified']
             mail_enabled = True
         else:
