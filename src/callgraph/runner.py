@@ -155,7 +155,7 @@ def main():
     )
 
     group_sync.add_argument(
-        "--noroleenable",
+        "--norole",
         help="Do not role enable target group during creation. Default is to role enable.",
         action="store_false",
     )
@@ -275,7 +275,7 @@ def main():
                         clgroup=args.cloudgroup,
                         test=args.testmode,
                         create=args.groupcreate,
-                        role_enable=args.noroleenable,
+                        role_enable=args.norole,
                         gtype=args.gtype
                     )
                 elif args.filename:
