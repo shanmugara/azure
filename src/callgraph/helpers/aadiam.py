@@ -434,7 +434,8 @@ class Aadiam(AzureAd):
             logad.error(f'Exception while checking for group object - {e}. Exiting..')
             return False
 
-        logad.info('Creating Azure AD group {}'.format(groupname))
+        logad.info(f'Creating Azure AD group name={groupname}, gtype={gtype}, role_enable={role_enable}, '
+                   f'assign_role={assign_role}')
         try:
             resp = self.session.post(url=_endpoint, headers=raw_headers, data=data_json)
 
