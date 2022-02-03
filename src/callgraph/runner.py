@@ -138,6 +138,8 @@ def main():
     )
     group_sync.add_argument("--days", help="Remaining number of days before a cert is rotated", type=int, default=30)
 
+    group_sync.add_argument("--gtype", help="Group type to create if create is True. (365 or None)", default=None)
+
     group_sync.add_argument(
         "-c", "--cloudgroup", help="Cloud group name", required=False, type=str
     )
@@ -153,7 +155,7 @@ def main():
     )
 
     group_sync.add_argument(
-        "--no-roleenable",
+        "--noroleenable",
         help="Do not role enable target group during creation. Default is to role enable.",
         action="store_false",
     )
@@ -273,6 +275,8 @@ def main():
                         clgroup=args.cloudgroup,
                         test=args.testmode,
                         create=args.groupcreate,
+                        role_enable=args.noroleenable,
+                        gtype=args.gtype
                     )
                 elif args.filename:
                     runner.iam.sync_group_json(filename=args.filename, create=args.groupcreate, )
