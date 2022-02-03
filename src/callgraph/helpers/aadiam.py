@@ -699,7 +699,7 @@ class Aadiam(AzureAd):
 
                 for sg in json_file_dict['security'].keys():
                     self.sync_group(adgroup=sg, clgroup=json_file_dict['security'][sg], test=test, create=create,
-                                    gtype=None, role_enable=role_enable)
+                                    gtype='', role_enable=role_enable)
 
                 for og in json_file_dict['365'].keys():
                     self.sync_group(adgroup=og, clgroup=json_file_dict['365'][og], test=test, create=create,
@@ -710,14 +710,14 @@ class Aadiam(AzureAd):
                 logad.info("Detected legacy input file schema type.")
                 for g in json_file_dict.keys():
                     self.sync_group(adgroup=g, clgroup=json_file_dict[g], test=test, create=create,
-                                    gtype=None, role_enable=True)
+                                    gtype='', role_enable=True)
 
         else:
             logad.error("Invalid arg type given to json_sync_proc, expected dict.")
             return False
 
     @Timer.add_timer
-    def sync_group(self, adgroup, clgroup, test=False, create=False, gtype=None, role_enable=True):
+    def sync_group(self, adgroup, clgroup, test=False, create=False, gtype='', role_enable=True):
         """
         Get group members from on-prem AD group and add to a AAD cloud group, and remove members not in on-prem AD group
         from cloud group. AD group is retrieved from on-prem ad. requires quest powershell module for ad. On-prem AD group
