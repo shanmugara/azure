@@ -665,8 +665,6 @@ class Aadiam(AzureAd):
                 logad.info('processing groups from sync file (git repo)..')
                 sync_group_dict = json.loads(git_file.read())
                 self.json_sync_proc(sync_group_dict, test=test, create=create)
-                # for g in sync_group_dict:
-                #     self.sync_group(adgroup=g, clgroup=sync_group_dict[g], test=test, create=create)
                 logad.info('finished processing sync file (git repo)..')
 
         except Exception as e:
@@ -691,10 +689,10 @@ class Aadiam(AzureAd):
                         role_enable = json_file_dict['role_enable']
                         logad.info(f"role_enable = {role_enable}")
                     else:
-                        logad.warning("Fallback (invalid key value, using default) role_enable=True")
+                        logad.warning("role_enable: invalid key value, using default, role_enable=True")
                         role_enable = True
                 else:
-                    logad.warning("Fallback (no key found, using default), role_enable=True")
+                    logad.warning("role_enable: no key defined, using default, role_enable=True")
                     role_enable = True
 
                 for sg in json_file_dict['security'].keys():
@@ -867,7 +865,7 @@ class Aadiam(AzureAd):
                         continue
                     else:
                         self.cldgroup_members_full = mems
-                        logad.info(f'Successfully created new role enabled Azure AD security group "{groupname}"')
+                        logad.info(f'Successfully created new Azure AD group "{groupname}"')
                         return True
                 logad.error('Unable to get new group object after 60 seconds. Exiting..')
                 return False

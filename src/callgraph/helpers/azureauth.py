@@ -35,7 +35,7 @@ pki = pki_helper.Cert()
 
 class AzureAd(object):
     """
-    Auth class
+    Azure AD authentication class. Use this as super class for other classes that need azure auth.
     """
 
     class Timer(object):

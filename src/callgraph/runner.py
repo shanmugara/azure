@@ -207,17 +207,26 @@ def main():
     caconf_rest = caconf.add_argument_group(title="Restore options")
     caconf_rest.add_argument("-r", "--restore", help="Restore the given config json file", action="store_true")
     caconf_rest.add_argument("-f", '--filename', help="Full path of the config file to restore")
+    caconf_rest.add_argument("--gitrepo", help="Git repo name, if using git repo", required=False)
+    caconf_rest.add_argument("--token", help="Git repo access token if git repo is used", required=False)
+    caconf_rest.add_argument("--url", help="Git hub access url", required=False, default=None)
+    caconf_rest.add_argument("--branch", help="Git branch name", required=False, default="master")
 
     nlconf = subparser.add_parser("nlconf", help="Named locations management")
-    nlconf_f = nlconf.add_mutually_exclusive_group()
-    nlconf_f.add_argument("-f", "--filename", help="Path of input CSV file name to import")
-    nlconf_f.add_argument("-d", "--dir", help="Directory path for outfiles")
+    nlconf_bak = nlconf.add_argument_group(title="Backup options")
+    nlconf_bak.add_argument("-d", "--dir", help="Directory path for outfiles")
+    nlconf_bak.add_argument("-b", "--backup", help="Create a backup of all named locations as CSV", action="store_true")
 
-    nlconf_actions = nlconf.add_mutually_exclusive_group()
-    nlconf_actions.add_argument("-u", "--update", help="Update an existing named location", action="store_true")
-    nlconf_actions.add_argument("-c", "--create", help="Create a new named location", action="store_true")
-    nlconf_actions.add_argument("-b", "--backup", help="Create a backup of all named locations as CSV",
-                                action="store_true")
+    nlconf_restore = nlconf.add_argument_group("Restore options")
+    nlconf_restore.add_argument("-f", "--filename", help="Path of input CSV file name to import/restore")
+    nlconf_restore_act = nlconf_restore.add_mutually_exclusive_group()
+    nlconf_restore_act.add_argument("-u", "--update", help="Update an existing named location", action="store_true")
+    nlconf_restore_act.add_argument("-c", "--create", help="Create a new named location", action="store_true")
+
+    nlconf_restore.add_argument("--gitrepo", help="Git repo name, if using git repo", required=False)
+    nlconf_restore.add_argument("--token", help="Git repo access token if git repo is used", required=False)
+    nlconf_restore.add_argument("--url", help="Git hub access url", required=False, default=None)
+    nlconf_restore.add_argument("--branch", help="Git branch name", required=False, default="master")
 
     pimmon = subparser.add_parser("pimmon", help="PIM Role change monitoring")
     pimmon_action = pimmon.add_mutually_exclusive_group()
@@ -303,14 +312,25 @@ def main():
             elif args.command == "caconf":
                 if all([args.backup, args.dir]):
                     runner.cap.export_all_cap(outdir=args.dir)
-                elif all([args.restore, args.filename]):
+                elif all([args.restore, args.filename, args.gitrepo, args.token]):
+                    runner.cap.import_cap_git(repo=args.gitrepo, filepath=args.filename, token=args.token,
+                                              git_url=args.url, branch=args.branch)
+                elif all([args.restore, args.filename]) and not args.gitrepo:
                     runner.cap.import_cap(filename=args.filename)
 
             elif args.command == "nlconf":
-                if all([args.filename, args.update]):
-                    runner.cap.update_nl(filepath=args.filename)
-                elif all([args.filename, args.create]):
-                    runner.cap.create_nl(filepath=args.filename)
+                if all([args.filename, args.update, args.gitrepo, args.token]):
+                    runner.cap.crud_nl_git(repo=args.gitrepo, filepath=args.filename, token=args.token,
+                                           git_url=args.url, branch=args.branch, mode="update")
+                elif all([args.filename, args.create, args.gitrepo, args.token]):
+                    runner.cap.crud_nl_git(repo=args.gitrepo, filepath=args.filename, token=args.token,
+                                           git_url=args.url, branch=args.branch, mode="create")
+                elif all([args.filename, args.update]) and not args.gitrepo:
+                    # runner.cap.update_nl(filepath=args.filename)
+                    runner.cap.crud_nl_file(filepath=args.filename, mode="update")
+                elif all([args.filename, args.create]) and not args.gitrepo:
+                    # runner.cap.create_nl(filepath=args.filename)
+                    runner.cap.crud_nl_file(filepath=args.filename, mode="create")
                 elif all([args.dir, args.backup]):
                     runner.cap.export_nl(outdir=args.dir)
 
