@@ -410,12 +410,14 @@ class Aadiam(AzureAd):
             group_type = []
             mail_enabled = False
 
+        mailnickname = re.sub("\s", "", groupname)
+
         data_dict = {
             'displayName': groupname,
             'description': 'Created by API',
             'isAssignableToRole': role_enable,
             'mailEnabled': mail_enabled,
-            'mailNickname': groupname,
+            'mailNickname': mailnickname,
             'securityEnabled': True,
             'groupTypes': group_type,
             'visibility': 'Private'
@@ -665,6 +667,8 @@ class Aadiam(AzureAd):
                 logad.info('processing groups from sync file (git repo)..')
                 sync_group_dict = json.loads(git_file.read())
                 self.json_sync_proc(sync_group_dict, test=test, create=create)
+                # for g in sync_group_dict:
+                #     self.sync_group(adgroup=g, clgroup=sync_group_dict[g], test=test, create=create)
                 logad.info('finished processing sync file (git repo)..')
 
         except Exception as e:

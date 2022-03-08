@@ -100,7 +100,6 @@ class AadCa(AzureAd):
             logcap.info(f'Reading CA policy config file {filename}')
             with open(filename) as f:
                 ca_conf_dict = json.load(f)
-                # data_json = json.dumps(ca_conf_dict)
                 logcap.info(f'Importing CA policy config from {filename} to Azure AD')
                 self.import_cap_common(ca_conf_dict=ca_conf_dict)
         else:
@@ -227,151 +226,9 @@ class AadCa(AzureAd):
             logcap.error(f'Getting named locations failed with exception - {e}')
             return False
 
-    # def update_nl(self, filepath=None):
-    #     """
-    #     Update an existing named location
-    #     :param filepath: path to the CSV file to import
-    #     CSV must include at least one of these identifier lines
-    #     #displayName:Name of the named location
-    #     #id:object id of the named location
-    #     If Trusted is not defined, default is untrusted
-    #     #isTrust:True|False
-    #     :return:
-    #     """
-    #     if filepath:
-    #         if not os.path.isfile(filepath):
-    #             logcap.error(f'File path not found - {filepath}')
-    #             return False
-    #
-    #         id, displayName, isTrusted, _invalid_ips, cidr_ips_lst, nl_tenancy = self.parse_nl_csv(filepath)
-    #
-    #         if _invalid_ips:
-    #             logcap.error('Found invalid cidr notations, wont proceed. Exiting')
-    #             return False
-    #
-    #         if nl_tenancy != tenancy:
-    #             logcap.error(f'Tenancy name mismatch between csv and config.py. wont proceed.')
-    #             return False
-    #
-    #         if id:
-    #             logcap.info(f'Found object id {id} in CSV, will use this to update object')
-    #
-    #         elif displayName:
-    #             logcap.info(f'Found object displayName {displayName} in CSV, will obtain object id')
-    #             nl_obj = self.get_nl(name=displayName)
-    #             if nl_obj['value']:
-    #                 id = nl_obj['value'][0]['id']
-    #             else:
-    #                 logcap.error('Unable to find a matching named location')
-    #                 return False
-    #         else:
-    #             logcap.error('Unable to find either displayName or id attributes in the CSV. Exiting')
-    #             return False
-    #
-    #         iprange_lst = []
-    #         for cr in cidr_ips_lst:
-    #             iprange_lst.append(
-    #                 {
-    #                     "@odata.type": "#microsoft.graph.iPv4CidrRange",
-    #                     "cidrAddress": cr
-    #                 }
-    #             )
-    #
-    #         data_dict = {
-    #             "@odata.type": "#microsoft.graph.ipNamedLocation",
-    #             "displayName": displayName,
-    #             "isTrusted": isTrusted,
-    #             "ipRanges": iprange_lst,
-    #         }
-    #
-    #         data_json = json.dumps(data_dict)
-    #
-    #         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
-    #         _endpoint = config["apiurl"] + f"/identity/conditionalAccess/namedLocations/{id.strip()}"
-    #
-    #         logcap.info(f'Updating named location object {id}, {displayName}')
-    #
-    #         try:
-    #             result = self.session.patch(url=_endpoint, data=data_json, headers=raw_headers)
-    #             if int(result.status_code) == 204:
-    #                 logcap.info(f'Successfully updated named location {displayName}')
-    #                 return result
-    #             else:
-    #                 logcap.error(f'Updating named location {displayName} failed with status code {result.status_code}')
-    #                 return result
-    #         except Exception as e:
-    #             logcap.error(f'Updating named location {displayName} failed with exception {e}')
-    #             return False
-    #
-    # def create_nl(self, filepath):
-    #     """
-    #     Create a new named location using the input file
-    #     :param filepath:
-    #     :return:
-    #     """
-    #     if filepath:
-    #         if not os.path.isfile(filepath):
-    #             logcap.error(f'File path not found - {filepath}')
-    #             return False
-    #
-    #         id, displayName, isTrusted, _invalid_ips, cidr_ips_lst, nl_tenancy = self.parse_nl_csv(filepath)
-    #
-    #         if _invalid_ips:
-    #             logcap.error('Found invalid cidr notations, wont proceed. Exiting')
-    #             return False
-    #
-    #         if nl_tenancy != tenancy:
-    #             logcap.error(f'Tenancy name mismatch between csv and config.py. wont proceed.')
-    #             return False
-    #
-    #         if displayName:
-    #             nl_obj = self.get_nl(name=displayName)
-    #             if nl_obj['value']:
-    #                 id = nl_obj['value'][0]['id']
-    #                 logcap.error(f'Found an existing named location {displayName}, {id}. Wont create. Exiting')
-    #                 return False
-    #         else:
-    #             logcap.error('Unable to find displayName attributed in the CSV. Exiting')
-    #             return False
-    #
-    #         iprange_lst = []
-    #         for cr in cidr_ips_lst:
-    #             iprange_lst.append(
-    #                 {
-    #                     "@odata.type": "#microsoft.graph.iPv4CidrRange",
-    #                     "cidrAddress": cr
-    #                 }
-    #             )
-    #
-    #         data_dict = {
-    #             "@odata.type": "#microsoft.graph.ipNamedLocation",
-    #             "displayName": displayName,
-    #             "isTrusted": isTrusted,
-    #             "ipRanges": iprange_lst,
-    #         }
-    #
-    #         data_json = json.dumps(data_dict)
-    #
-    #         raw_headers = {"Authorization": "Bearer " + self.auth['access_token'], "Content-type": "application/json"}
-    #         _endpoint = config["apiurl"] + f"/identity/conditionalAccess/namedLocations"
-    #
-    #         logcap.info(f'Creating new named location object {displayName}')
-    #
-    #         try:
-    #             result = self.session.post(url=_endpoint, data=data_json, headers=raw_headers)
-    #             if int(result.status_code) == 201:
-    #                 logcap.info(f'Successfully created named location {displayName}')
-    #                 return result
-    #             else:
-    #                 logcap.error(f'Creating named location {displayName} failed with status code {result.status_code}')
-    #                 return result
-    #         except Exception as e:
-    #             logcap.error(f'Creating named location {displayName} failed with exception {e}')
-    #             return False
-
     def crud_nl_file(self, filepath, mode):
         """
-        Named location update parser for file mode
+        Named location update parser for filesystem file
         :param filename:
         :return:
         """
@@ -380,18 +237,17 @@ class AadCa(AzureAd):
             return False
 
         id, displayName, isTrusted, _invalid_ips, cidr_ips_lst, nl_tenancy = self.parse_nl_csv(filepath)
-
         self.crud_nl_common(id, displayName, isTrusted, _invalid_ips, cidr_ips_lst, nl_tenancy, mode)
 
     def crud_nl_git(self, repo, filepath, token, mode, git_url=None, branch='master'):
         """
         Update named location from a file in git repo
-        :param repo:
-        :param filepath:
-        :param token:
+        :param repo: repo name
+        :param filepath: relative path to file in the repo
+        :param token: access token
         :param mode: operation mode update | create
         :param git_url:
-        :param branch:
+        :param branch: git branch
         :return:
         """
         logcap.title("Processing named location file using git repo")
@@ -410,10 +266,10 @@ class AadCa(AzureAd):
             git_file = com_utils.github_get_file(base_url=base_url, repo=repo, path=filepath, git_token=token,
                                                  branch=branch)
             if git_file:
-                logcap.info('processing conditional policies file (git repo)..')
-                cap_dict = json.loads(git_file.read())
-                self.import_cap_common(ca_conf_dict=cap_dict)
-                logcap.info('finished processing conditional policies file (git repo)..')
+                logcap.info('processing named locations file (git repo)..')
+                id, displayName, isTrusted, _invalid_ips, cidr_ips_lst, nl_tenancy = self.parse_nl_csv(git_file)
+                self.crud_nl_common(id, displayName, isTrusted, _invalid_ips, cidr_ips_lst, nl_tenancy, mode)
+                logcap.info('finished processing named locations file (git repo)..')
 
         except Exception as e:
             logcap.error(f'Exception was thrown while getting file from github repo - {e}')

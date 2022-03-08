@@ -208,9 +208,9 @@ def main():
     caconf_rest.add_argument("-r", "--restore", help="Restore the given config json file", action="store_true")
     caconf_rest.add_argument("-f", '--filename', help="Full path of the config file to restore")
     caconf_rest.add_argument("--gitrepo", help="Git repo name, if using git repo", required=False)
-    caconf_rest.add_argument("--token", help="Git repo access token if git repo is used", required=False)
-    caconf_rest.add_argument("--url", help="Git hub access url", required=False, default=None)
-    caconf_rest.add_argument("--branch", help="Git branch name", required=False, default="master")
+    caconf_rest.add_argument("--token", help="Git repo access token if using git repo", required=False)
+    caconf_rest.add_argument("--url", help="Git hub access url (optional, can also be set in config)", required=False, default=None)
+    caconf_rest.add_argument("--branch", help="Git branch name (optional, default=master)", required=False, default="master")
 
     nlconf = subparser.add_parser("nlconf", help="Named locations management")
     nlconf_bak = nlconf.add_argument_group(title="Backup options")
@@ -224,9 +224,9 @@ def main():
     nlconf_restore_act.add_argument("-c", "--create", help="Create a new named location", action="store_true")
 
     nlconf_restore.add_argument("--gitrepo", help="Git repo name, if using git repo", required=False)
-    nlconf_restore.add_argument("--token", help="Git repo access token if git repo is used", required=False)
-    nlconf_restore.add_argument("--url", help="Git hub access url", required=False, default=None)
-    nlconf_restore.add_argument("--branch", help="Git branch name", required=False, default="master")
+    nlconf_restore.add_argument("--token", help="Git repo access token if using git repo", required=False)
+    nlconf_restore.add_argument("--url", help="Git hub access url (optional, can also be set in config)", required=False, default=None)
+    nlconf_restore.add_argument("--branch", help="Git branch name (optional, default=master)", required=False, default="master")
 
     pimmon = subparser.add_parser("pimmon", help="PIM Role change monitoring")
     pimmon_action = pimmon.add_mutually_exclusive_group()
